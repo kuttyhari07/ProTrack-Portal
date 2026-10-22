@@ -38,7 +38,13 @@ Milestones: ${milestones.length} total, ${milestones.filter(m => m.status === 'c
 Active Issues: ${openIssues.length} (${criticalIssues.length} critical)
 Rules: Do NOT invent fake numbers. Ground strictly in the above data. Separate verified facts from recommendations.`;
 
-      const modelsToTry = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
+      const modelsToTry = [
+        'gemini-3.5-flash-lite',
+        'gemini-flash-lite-latest',
+        'gemma-4-26b-a4b-it',
+        'gemini-3.8-flash',
+        'gemini-3.5-flash'
+      ];
       let generatedText = null;
 
       for (const modelName of modelsToTry) {
@@ -53,8 +59,12 @@ Rules: Do NOT invent fake numbers. Ground strictly in the above data. Separate v
 
           if (response.ok) {
             const data = await response.json();
-            generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (generatedText) break;
+            const parts = data.candidates?.[0]?.content?.parts;
+            if (Array.isArray(parts)) {
+              const textPart = parts.find((p) => p.text && !p.thought);
+              generatedText = textPart?.text || parts[0]?.text;
+              if (generatedText) break;
+            }
           }
         } catch (mErr) {
           // continue to next model

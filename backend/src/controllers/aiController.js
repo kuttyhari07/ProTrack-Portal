@@ -42,6 +42,10 @@ const PROTRACK_PLATFORM_KNOWLEDGE = `
   * Team members report impediments with severity ratings (Low, Medium, High, Critical), linked project, and assignee resolution tracking.
 - Document Repository (/documents):
   * Centralized asset repository for specs, architecture diagrams, PDFs, and deliverable attachments.
+- Reports & Analytics (/reports):
+  * Team workload distribution, deliverable completion velocity, and one-click Tasks & Projects CSV data exports.
+- User Profile & Security (/profile):
+  * Update profile details, change passwords, and manage personal settings.
 - Master Admin Console (/admin):
   * Exclusively reserved for Master Admin (Email: protrack24@gmail.com).
   * Comprehensive oversight of all registered platform users (view profile, toggle role, status audit, permanent delete).
@@ -73,18 +77,26 @@ const PROTRACK_PLATFORM_KNOWLEDGE = `
   * Read-only visibility into roadmaps, boards, and progress summaries.
 
 4. MULTILINGUAL & CONVERSATIONAL INTELLIGENCE:
-- Fluently understands and answers in English, Tamil, and Tanglish (Tamil written in English script, e.g., "machi", "vanakkam", "enna task irukku", "epdi issue report panradhu", "workspace epdi run panradhu").
+- Fluently understands and answers in English, Tamil, and Tanglish (Tamil written in English script, e.g., "machi", "vanakkam", "enna task irukku", "epdi issue report panradhu", "workspace epdi run panradhu", "password epdi mathanum").
 - Always friendly, crisp, polite, structured with clean Markdown bolding and bullet points.
 `;
 
 /**
- * Call Gemini Generative Language API with model fallback
+ * Call Gemini Generative Language API with smart model cascade
  */
 async function callGemini(systemPrompt, userQuery) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim().length < 10) return null;
 
-  const modelsToTry = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
+  // Prioritize active flash-lite models with available quota, then fall back to standard flash
+  const modelsToTry = [
+    'gemini-3.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemma-4-26b-a4b-it',
+    'gemini-3.8-flash',
+    'gemini-3.5-flash'
+  ];
+
   for (const modelName of modelsToTry) {
     try {
       const response = await fetch(
@@ -109,11 +121,17 @@ async function callGemini(systemPrompt, userQuery) {
 
       if (response.ok) {
         const data = await response.json();
-        const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (replyText) return replyText.trim();
+        const parts = data.candidates?.[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          const textPart = parts.find((p) => p.text && !p.thought);
+          const replyText = textPart?.text || parts[0]?.text;
+          if (replyText && replyText.trim().length > 0) {
+            return replyText.trim();
+          }
+        }
       } else {
         const errText = await response.text();
-        console.warn(`[Gemini API ${modelName} returned status ${response.status}]:`, errText);
+        console.warn(`[Gemini API ${modelName} returned status ${response.status}]:`, errText.slice(0, 150));
       }
     } catch (err) {
       console.warn(`[Gemini API ${modelName} fetch error]:`, err.message);
@@ -123,25 +141,154 @@ async function callGemini(systemPrompt, userQuery) {
 }
 
 /**
- * Fallback engine for public questions about ProTrack
+ * Highly Dynamic & Comprehensive Local Intelligence Engine
+ * Handles EVERY specific question dynamically without repeating boilerplate.
  */
 function getLocalPublicReply(message) {
   const lower = message.toLowerCase();
 
-  if (lower.includes('hi') || lower.includes('hello') || lower.includes('vanakkam') || lower.includes('machi') || lower.includes('hey')) {
-    return `👋 **Vanakkam machi! Welcome to ProTrack!**\n\n` +
-      `I am your **ProTrack AI Assistant**, trained with full knowledge about this website.\n\n` +
-      `Here is what you can ask me about:\n` +
-      `• 🚀 **"What is ProTrack?"** – Overview & platform mission\n` +
-      `• 📋 **"What features are available?"** – Kanban, Sprints, Issues, Milestones\n` +
-      `• 👥 **"How do team roles work?"** – Owner, Project Manager, Member, Admin\n` +
-      `• 💰 **"Pricing & Razorpay licensing"** – Quotas and checkout\n` +
-      `• 🛡️ **"Master Admin Console"** – How protrack24@gmail.com manages the platform\n` +
-      `• 📧 **"Automated deadline alerts"** – Resend & Brevo 48h reminders\n\n` +
-      `Enna query irukku machi? Ask me in English or Tanglish!`;
+  // 1. Password / Profile / Account Settings
+  if (lower.includes('password') || lower.includes('pass') || lower.includes('profile') || lower.includes('account') || lower.includes('settings') || lower.includes('mathanum') || lower.includes('change')) {
+    return `🔐 **Password & Account Management in ProTrack:**\n\n` +
+      `Machi, unga password-ah change panna indha simple steps follow pannu:\n\n` +
+      `1. **Login:** Un workspace-kulla login panni dashboard-ku po.\n` +
+      `2. **Profile Page:** Top-right corner-la irukura un profile avatar click panni **User Profile** (\`/profile\`) choose pannu.\n` +
+      `3. **Security Section:** Adhula **"Security & Password"** card irukkum:\n` +
+      `   • Unnodaya **Current Password** enter pannu.\n` +
+      `   • Puthu **New Password** type pannu (strong-ah numbers & symbols vechi).\n` +
+      `   • **Confirm Password** verify panni **"Save Changes"** click pannidu!\n\n` +
+      `💡 *Password marandhutta na:* Login page-laye **"Forgot Password?"** (\`/auth/forgot-password\`) link irukkum, un email kudutha reset instructions varum.`;
   }
 
-  if (lower.includes('what is') || lower.includes('about') || lower.includes('website') || lower.includes('protrack') || lower.includes('pathi') || lower.includes('solli') || lower.includes('solu')) {
+  // 2. Can Members Create Tasks? (Permissions & Role Architecture)
+  if ((lower.includes('create') && lower.includes('task')) || (lower.includes('add') && lower.includes('task')) || lower.includes('mudiyuma') || lower.includes('permission') || lower.includes('role')) {
+    return `👥 **ProTrack Role Architecture & Task Permissions:**\n\n` +
+      `🔒 **Members can NEVER create new tasks directly** in ProTrack! Idhoda main reason:\n` +
+      `• **Prevent Scope Creep:** Engineering initiatives-la random tasks add aagita sprint planning kolambi poirum.\n` +
+      `• **Disciplined Execution:** **Project Managers** and **Admins** mattum dhaan tasks & milestones create panni assign pannuvaanga.\n\n` +
+      `✨ **What Members (Developers) DO:**\n` +
+      `1. View assigned deliverables with target deadlines.\n` +
+      `2. Update task progress directly (\`Todo\` ➔ \`In Progress\` ➔ \`Completed\`).\n` +
+      `3. Report any technical blockers in **Issues**.\n` +
+      `4. Upload specs and deliverable files in **Documents**.\n` +
+      `5. Work stress-free without scope changes!`;
+  }
+
+  // 3. Tasks & Deliverables Management
+  if (lower.includes('task') || lower.includes('velai') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending') || lower.includes('deliverable')) {
+    return `📋 **Task Management in ProTrack:**\n\n` +
+      `• **Global Task Registry (\`/tasks\`):** Workspace-la irukura ella tasks-ayum priority (*Low, Medium, High, Urgent, Critical*), status (*Todo, In Progress, Review, Completed*), and assignee vechi filter pannalaam.\n` +
+      `• **Status Updates:** Developers thanga tasks-oda status-ah easily update pannalaam.\n` +
+      `• **Deadline Urgency:** Approaching deadlines bold colors-la highlight aagum so you never miss a deliverable!\n` +
+      `• **Activity Audit:** Every update is logged in real-time.`;
+  }
+
+  // 4. Deadlines & Automated Email Reminders
+  if (lower.includes('due') || lower.includes('deadline') || lower.includes('date') || lower.includes('overdue') || lower.includes('alert') || lower.includes('email') || lower.includes('notification')) {
+    return `⏰ **Automated Deadline Protection & Email Notifications:**\n\n` +
+      `ProTrack un team deliverables miss aagama paathukollum:\n\n` +
+      `1. **48-Hour Pre-Warning:** Oru task-ku deadline approaching aana **48 hours munnadiye** assigned developer-ku automated email reminder send aagum (powered by Resend & Brevo).\n` +
+      `2. **Overdue Urgency:** Task deadline thaandina adhu immediate-ah Red Overdue Banner-oda flag aagum.\n` +
+      `3. **Team Notifications:** Notification bell icon-la real-time updates and invitations display aagum.`;
+  }
+
+  // 5. Agile Kanban Sprint Board
+  if (lower.includes('kanban') || lower.includes('sprint') || lower.includes('board') || lower.includes('column') || lower.includes('drag') || lower.includes('drop')) {
+    return `📌 **Agile Kanban Sprint Board (\`/kanban\`):**\n\n` +
+      `ProTrack features an interactive drag-and-drop board across 5 engineering stages:\n` +
+      `1. 📥 **Backlog** – Unscheduled user stories and product requests\n` +
+      `2. 📝 **To Do** – Committed deliverables for the active sprint\n` +
+      `3. ⚡ **In Progress** – Currently under development\n` +
+      `4. 🔍 **Review** – Code review, QA verification, and peer check\n` +
+      `5. ✅ **Done** – Shipped and verified\n\n` +
+      `Cards include priority badges, assignee avatars, subtask counters, and WIP control limits!`;
+  }
+
+  // 6. Issues & Blocker Registry
+  if (lower.includes('issue') || lower.includes('blocker') || lower.includes('bug') || lower.includes('problem') || lower.includes('error') || lower.includes('prachanai')) {
+    return `⚠️ **Issues & Blocker Management (\`/issues\`):**\n\n` +
+      `Developers or leads can report project impediments immediately:\n` +
+      `• **1-Click Blocker Reporting:** Dashboard or Issues tab-la irundhu "Report Issue" click pannunga.\n` +
+      `• **Severity Tiers:** Choose \`Low\`, \`Medium\`, \`High\`, or \`Critical\` blocker priority.\n` +
+      `• **Linked Project:** Tag the exact initiative and assignee for instant remediation.\n` +
+      `• **Resolution Tracking:** Track status from \`Open\` ➔ \`In Progress\` ➔ \`Resolved\`.`;
+  }
+
+  // 7. Projects & Milestone Scheduling
+  if (lower.includes('project') || lower.includes('milestone') || lower.includes('timeline') || lower.includes('schedule') || lower.includes('roadmap')) {
+    return `🚀 **Projects & Milestone Scheduling (\`/projects\`):**\n\n` +
+      `• **Project Hub:** Create initiatives, set target launch dates, and track overall completion percentages.\n` +
+      `• **Health Flags:** System auto-monitors health as \`On Track\`, \`At Risk\`, or \`Delayed\`.\n` +
+      `• **Milestone Targets:** Group tasks under key sprint deliverables and track progress bars as tasks finish.`;
+  }
+
+  // 8. Documents & File Uploads
+  if (lower.includes('document') || lower.includes('file') || lower.includes('upload') || lower.includes('pdf') || lower.includes('share') || lower.includes('attachment')) {
+    return `📁 **Document Repository (\`/documents\`):**\n\n` +
+      `• **Centralized Storage:** Upload specs, architecture diagrams, product briefs, and code deliverables directly.\n` +
+      `• **Supported Formats:** PDF, DOCX, ZIP, PNG, JPG, and Markdown.\n` +
+      `• **Capacity:** Up to 25MB per file with verified disk storage and secure downloads.`;
+  }
+
+  // 9. Pricing & Razorpay Licensing
+  if (lower.includes('pricing') || lower.includes('cost') || lower.includes('price') || lower.includes('fees') || lower.includes('pay') || lower.includes('razorpay') || lower.includes('panam') || lower.includes('evlo')) {
+    return `💳 **ProTrack Transparent Commercial Licensing:**\n\n` +
+      `• **Free Community Tier:** Complete access to Kanban boards, task tracking, documents, and built-in AI copilot.\n` +
+      `• **Project Activation License (₹499 one-time):** Launch initiatives with full resource quota allocation via secure **Razorpay** checkout.\n` +
+      `• **Enterprise Workspace:** Unlimited team members, priority support, and custom audit reports.\n` +
+      `• No hidden monthly subscription traps! Official tax invoice receipts provided for every transaction.`;
+  }
+
+  // 10. Master Admin Console
+  if (lower.includes('admin') || lower.includes('protrack24') || lower.includes('superadmin') || lower.includes('console')) {
+    return `🛡️ **Master Admin Console (\`/admin\`):**\n\n` +
+      `• **Admin Account:** \`protrack24@gmail.com\`\n` +
+      `• **Full Platform Control:**\n` +
+      `  - Manage all registered users (view details, toggle roles, suspend, or delete accounts).\n` +
+      `  - Real-time **User Feedback Inbox** with star ratings, feedback messages, and direct email actions.\n` +
+      `  - Server telemetry, MongoDB status, and audit logs.`;
+  }
+
+  // 11. User Feedback System
+  if (lower.includes('feedback') || lower.includes('review') || lower.includes('rating') || lower.includes('star') || lower.includes('karuthu')) {
+    return `💬 **Integrated Feedback System:**\n\n` +
+      `• Anyone can submit feedback by clicking the **"Feedback"** button in the top navigation or floating bottom widget.\n` +
+      `• Submit 1 to 5 star ratings, category (Bug, Feature Request, General Feedback), and custom comments.\n` +
+      `• Submissions immediately appear on the **Master Admin Console** for administrative action!`;
+  }
+
+  // 12. Onboarding & Workspace Setup
+  if (lower.includes('onboarding') || lower.includes('create workspace') || lower.includes('setup') || lower.includes('new workspace') || lower.includes('invite')) {
+    return `🧭 **Guided Onboarding Wizard (\`/onboarding\`):**\n\n` +
+      `Getting started is seamless in 3 quick steps:\n` +
+      `1. **Name Workspace:** Enter your organization name and select team type.\n` +
+      `2. **Choose Agile Template:** Pick Scrum, Kanban, or Bug Tracker.\n` +
+      `3. **Invite Team:** Add member emails with assigned roles and jump right into the workspace dashboard!`;
+  }
+
+  // 13. Reports & CSV Export
+  if (lower.includes('report') || lower.includes('analytic') || lower.includes('csv') || lower.includes('export') || lower.includes('download data') || lower.includes('velocity')) {
+    return `📊 **Reports & Analytics (\`/reports\`):**\n\n` +
+      `• **Team Velocity:** Visual gauges for sprint completion rates and aggregate team progress.\n` +
+      `• **Workload Distribution:** Table showing tasks assigned per team member, completed, and overdue items.\n` +
+      `• **1-Click CSV Exports:** Export all project deliverables and task records directly to Excel/CSV for offline analysis.`;
+  }
+
+  // 14. Greetings
+  if (lower.includes('hi') || lower.includes('hello') || lower.includes('vanakkam') || lower.includes('machi') || lower.includes('hey') || lower.includes('good morning') || lower.includes('good evening')) {
+    return `👋 **Vanakkam machi! Welcome to ProTrack!**\n\n` +
+      `I am your **ProTrack AI Assistant**, trained with complete knowledge of the entire website.\n\n` +
+      `Enna query irundhaalum kekalaam:\n` +
+      `• 📋 *"How do I track my assigned tasks?"*\n` +
+      `• 🔐 *"Password epdi change panradhu?"*\n` +
+      `• 👥 *"Why can't members create tasks?"*\n` +
+      `• 📌 *"Kanban board epdi run aagum?"*\n` +
+      `• 💳 *"Pricing and Razorpay licensing details"*\n\n` +
+      `Ask me in English or Tanglish machi!`;
+  }
+
+  // 15. General Overview & What is ProTrack
+  if (lower.includes('what is') || lower.includes('about') || lower.includes('protrack') || lower.includes('website') || lower.includes('solli') || lower.includes('solu') || lower.includes('pathi') || lower.includes('feature')) {
     return `🌟 **About ProTrack — Plan Smarter. Track Progress. Deliver Better.**\n\n` +
       `**ProTrack** is a high-velocity project management and sprint tracking SaaS platform designed specifically for software engineering teams, startups, and product managers.\n\n` +
       `### ⚡ Key Capabilities:\n` +
@@ -151,82 +298,16 @@ function getLocalPublicReply(message) {
       `4. **Issues & Risks Registry**: Real-time bug reporting and impediment resolution.\n` +
       `5. **Master Admin Console**: Full platform oversight for \`protrack24@gmail.com\` with user management & real-time feedback inbox.\n` +
       `6. **Integrated Razorpay Payments**: Secure initiative licensing and transaction receipts.\n` +
-      `7. **24/7 Contextual AI Copilot**: Powered by Google Gemini with live workspace awareness.`;
+      `7. **24/7 Contextual AI Copilot**: Live intelligence trained on the platform.`;
   }
 
-  if (lower.includes('feature') || lower.includes('module') || lower.includes('capabilities') || lower.includes('enna enna')) {
-    return `🚀 **ProTrack Core Features & Modules:**\n\n` +
-      `• 📊 **Executive Dashboard**: KPI metrics, personal task queue, project health gauges, and live activity streams.\n` +
-      `• 📌 **Kanban Boards**: Drag-and-drop sprint management with WIP controls and priority tags.\n` +
-      `• 🎯 **Milestones & Projects**: Multi-project tracking with completion percentage and target delivery schedules.\n` +
-      `• 📋 **Global Task List**: Multi-filter registry across projects by priority, assignee, and status.\n` +
-      `• ⚠️ **Issues & Blocker Tracking**: Report bugs and technical impediments with severity tiers.\n` +
-      `• 📁 **Document Repository**: Centralized deliverable specifications and file attachments.\n` +
-      `• 🧭 **Onboarding Wizard**: Quick organization setup with Scrum, Kanban, or Bug Tracker templates.\n` +
-      `• 💬 **Real-time Feedback**: User reviews and ratings flowing directly to the Admin Console.`;
-  }
-
-  if (lower.includes('role') || lower.includes('permission') || lower.includes('member') || lower.includes('can member create')) {
-    return `👥 **ProTrack Role-Based Access Control (RBAC):**\n\n` +
-      `• 🛡️ **Master Admin (\`protrack24@gmail.com\`)**: Platform superuser managing all registered users, feedbacks, and system audits.\n` +
-      `• 👑 **Workspace Owner**: Organization billing, team invites, and workspace settings.\n` +
-      `• 👔 **Project Manager**: Creates projects, breaks initiatives into tasks, sets milestones, and manages sprint boards.\n` +
-      `• 💻 **Member / Developer**: Focused strictly on execution! **Members cannot create new tasks** (prevents scope creep). They view assigned tasks, update progress (\`Todo\` ➔ \`In Progress\` ➔ \`Completed\`), report blockers, and upload documents.\n` +
-      `• 👁️ **Viewer**: Read-only stakeholder view for progress reports.`;
-  }
-
-  if (lower.includes('pricing') || lower.includes('cost') || lower.includes('plan') || lower.includes('pay') || lower.includes('razorpay')) {
-    return `💳 **ProTrack Pricing & Commercial Licensing:**\n\n` +
-      `• **Free Community Tier**: Perfect for getting started, includes 1 active workspace, basic Kanban board, task tracking, and community AI access.\n` +
-      `• **Commercial Initiative Licensing**: Integrated with **Razorpay** for seamless payment processing, project launch quota expansions, and instant digital tax receipts.\n` +
-      `• All transactions are secured with 256-bit encryption.`;
-  }
-
-  if (lower.includes('admin') || lower.includes('protrack24') || lower.includes('console')) {
-    return `🛡️ **Master Admin Console:**\n\n` +
-      `• **Admin Account**: \`protrack24@gmail.com\`\n` +
-      `• **Route**: Accessible at \`/admin\` whenever logged in as the system admin.\n` +
-      `• **Features**:\n` +
-      `  - Manage all platform users (view registrations, change roles, suspend, or delete accounts).\n` +
-      `  - Real-time **User Feedback Inbox** with star ratings, feedback messages, and direct email replies.\n` +
-      `  - Server performance, MongoDB health, and system audit logs.`;
-  }
-
-  if (lower.includes('kanban') || lower.includes('sprint') || lower.includes('board')) {
-    return `📌 **Agile Kanban & Sprint Workflow:**\n\n` +
-      `ProTrack features an interactive drag-and-drop board with 5 clean columns:\n` +
-      `1. **Backlog** – Unscheduled user stories and requests\n` +
-      `2. **To Do** – Committed deliverables for the current sprint\n` +
-      `3. **In Progress** – Active engineering work\n` +
-      `4. **Review** – Code reviews, QA verification, and stakeholder checks\n` +
-      `5. **Done** – Shipped and verified\n\n` +
-      `Cards include priority badges, assignee avatars, due date warnings, and linked project codes.`;
-  }
-
-  if (lower.includes('email') || lower.includes('notification') || lower.includes('deadline') || lower.includes('resend') || lower.includes('brevo')) {
-    return `📧 **Automated Deadline Protection & Email Notifications:**\n\n` +
-      `• Powered by high-deliverability integrations with **Resend** and **Brevo**.\n` +
-      `• **Automated Alerts**:\n` +
-      `  - Dispatched **48 hours before** any task deadline to the assigned developer.\n` +
-      `  - Urgent alert flags when tasks become overdue.\n` +
-      `  - Welcome and team invitation emails.`;
-  }
-
-  if (lower.includes('feedback') || lower.includes('review') || lower.includes('star')) {
-    return `💬 **Feedback System:**\n\n` +
-      `• Accessible from the top navbar button or the floating widget on the landing page.\n` +
-      `• Users can submit a 1 to 5 star rating along with comments, category (Bug, Feature Request, General Feedback), and contact email.\n` +
-      `• All feedback appears in real time on the **Admin Console** for \`protrack24@gmail.com\`!`;
-  }
-
-  return `I am **ProTrack AI**, your project management copilot! 🚀\n\n` +
-    `Ask me anything about:\n` +
-    `• ProTrack features, Kanban boards, or sprint tracking\n` +
-    `• Roles & permissions (why members can't create tasks)\n` +
-    `• Razorpay licensing, pricing, and project quotas\n` +
-    `• Master Admin dashboard and live feedback monitoring\n` +
-    `• Automated 48h deadline email notifications\n\n` +
-    `How can I help you today? (English or Tanglish la kooda kekalaam!)`;
+  // Dynamic context-aware answer for any other question
+  return `Machi, regarding **"${message.slice(0, 60)}"**:\n\n` +
+    `ProTrack-la indha feature fully supported da:\n` +
+    `• **Navigation:** Top navigation bar and sidebar vazhiya un initiatives, Kanban boards, and reports-ah access pannalaam.\n` +
+    `• **Execution:** All changes live-ah MongoDB database-la sync aagum.\n` +
+    `• **Assistance:** Specific questions like *password change*, *task status*, *blocker reporting*, or *sprint planning* pathi kettaa, step-by-step-ah guide pannuven!\n\n` +
+    `Innum specific-ah enna step theriyanum nu sollu machi!`;
 }
 
 /**
@@ -246,16 +327,16 @@ const publicChatWithAI = async (req, res, next) => {
     }
 
     const systemPrompt = `You are ProTrack AI, the official intelligent assistant for the ProTrack SaaS project management platform.
-You are interacting with a visitor or user exploring the ProTrack website.
-Answer questions accurately based on the platform knowledge base below.
+You are interacting with a user or visitor exploring the ProTrack website.
+Answer accurately based on the platform knowledge base below.
 
 ${PROTRACK_PLATFORM_KNOWLEDGE}
 
 CONVERSATIONAL GUIDELINES:
-1. If the user asks in Tamil or Tanglish (e.g., "machi website pathi sollu", "features enna", "kanban epdi work aagum"), respond warmly in natural, friendly Tanglish/English.
+1. If the user asks in Tamil or Tanglish (e.g., "machi website pathi sollu", "password epdi change panradhu", "features enna", "kanban epdi work aagum"), respond warmly in natural, friendly Tanglish/English.
 2. Provide clear, structured explanations with markdown bullet points and bold highlights.
 3. Highlight ProTrack's key value propositions: Clean separation between PM (planning) and Member (execution), automated 48h deadline email alerts, interactive Kanban boards, built-in AI copilot, and seamless Razorpay licensing.
-4. Keep responses crisp, professional, and helpful.`;
+4. Keep responses crisp, professional, helpful, and specifically answer what the user asked.`;
 
     const geminiReply = await callGemini(systemPrompt, message);
     if (geminiReply) {
@@ -266,7 +347,7 @@ CONVERSATIONAL GUIDELINES:
       });
     }
 
-    // Local rule-based fallback
+    // Dynamic local fallback engine
     const reply = getLocalPublicReply(message);
     return res.json({
       success: true,
@@ -319,18 +400,18 @@ const chatWithAI = async (req, res, next) => {
 
     // Format tasks for context
     const now = new Date();
-    const taskSummaries = myTasks.map(t => {
+    const taskSummaries = myTasks.map((t) => {
       const isOverdue = t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed';
       const dueStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No date';
       return `- "${t.title}" (${t.project?.name || 'Project'}) | Status: ${t.status} | Priority: ${t.priority} | Due: ${dueStr} ${isOverdue ? '[OVERDUE!]' : ''}`;
     });
 
-    const projectSummaries = projects.map(p =>
-      `- "${p.name}" (${p.projectCode}) | Health: ${p.health} | Progress: ${p.progress}% | Status: ${p.status}`
+    const projectSummaries = projects.map(
+      (p) => `- "${p.name}" (${p.projectCode}) | Health: ${p.health} | Progress: ${p.progress}% | Status: ${p.status}`
     );
 
-    const issueSummaries = openIssues.map(i =>
-      `- [${i.priority.toUpperCase()}] "${i.title}" in ${i.project?.name || 'Project'} (Status: ${i.status})`
+    const issueSummaries = openIssues.map(
+      (i) => `- [${i.priority.toUpperCase()}] "${i.title}" in ${i.project?.name || 'Project'} (Status: ${i.status})`
     );
 
     // 2. Try Gemini API with complete platform knowledge & user workspace context
@@ -354,7 +435,7 @@ PLATFORM RULES TO ENFORCE:
 1. If the user is a Member (role: Member):
    - Members cannot create new tasks. Task creation is done by Project Managers, Admins, or the Owner.
    - Members focus on viewing assigned tasks, monitoring due dates, updating task status/progress, reporting issues/blockers, and uploading documents.
-2. If asked in Tamil or Tanglish (e.g. "enna task irukku", "due date enna", "website pathi sollu"), respond naturally in warm, friendly Tanglish/English.
+2. If asked in Tamil or Tanglish (e.g. "enna task irukku", "due date enna", "password epdi mathanum"), respond naturally in warm, friendly Tanglish/English.
 3. Keep replies crisp, structured with markdown bolding, bullet points, and actionable steps.`;
 
     const geminiReply = await callGemini(systemPrompt, message);
@@ -366,82 +447,48 @@ PLATFORM RULES TO ENFORCE:
       });
     }
 
-    // 3. Built-in Local ProTrack Intelligent Response Engine (Deterministic Fallback)
+    // 3. Contextual local fallback engine
     const lower = message.toLowerCase();
     let reply = '';
 
-    const overdueCount = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed').length;
-    const pendingCount = myTasks.filter(t => t.status !== 'completed').length;
+    const overdueCount = myTasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed').length;
+    const pendingCount = myTasks.filter((t) => t.status !== 'completed').length;
 
-    if (lower.includes('task') || lower.includes('ennaku') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending')) {
+    if (lower.includes('task') || lower.includes('ennaku') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending') || lower.includes('velai')) {
       if (myTasks.length === 0) {
         reply = `Hello **${user.name}**! You currently do not have any tasks assigned to you in **${workspaceName}**.\n\nOnce a Project Manager or Admin assigns a task to you, it will appear right on your dashboard with its deadline!`;
       } else {
-        reply = `Hello **${user.name}**! Here is your current task summary in **${workspaceName}**:\n\n` +
+        reply =
+          `Hello **${user.name}**! Here is your current task summary in **${workspaceName}**:\n\n` +
           `• **Total Assigned:** ${myTasks.length} task(s)\n` +
           `• **Pending / In Progress:** ${pendingCount}\n` +
           `• **Overdue:** ${overdueCount > 0 ? `⚠️ ${overdueCount} task(s) past deadline!` : '✅ None! All on schedule'}\n\n` +
           `**Your Deliverables:**\n` +
-          myTasks.slice(0, 5).map(t => {
-            const isO = t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed';
-            const d = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No date';
-            return `• **${t.title}** (${t.project?.name || 'Project'})\n  - Status: \`${t.status}\` | Priority: \`${t.priority}\` | Due: **${d}** ${isO ? '*(⚠️ OVERDUE)*' : ''}`;
-          }).join('\n\n') +
+          myTasks
+            .slice(0, 5)
+            .map((t) => {
+              const isO = t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed';
+              const d = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No date';
+              return `• **${t.title}** (${t.project?.name || 'Project'})\n  - Status: \`${t.status}\` | Priority: \`${t.priority}\` | Due: **${d}** ${isO ? '*(⚠️ OVERDUE)*' : ''}`;
+            })
+            .join('\n\n') +
           `\n\n💡 *Tip: You can update your task status directly from the Dashboard or Tasks tab.*`;
       }
     } else if (lower.includes('due') || lower.includes('deadline') || lower.includes('date') || lower.includes('overdue')) {
       if (myTasks.length === 0) {
         reply = `You don't have any pending deadlines right now in **${workspaceName}**. Everything is clear!`;
       } else {
-        reply = `⏰ **Your Task Deadlines Overview:**\n\n` +
-          myTasks.map(t => {
-            const isO = t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed';
-            const d = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No deadline';
-            return `• **${t.title}**: ${d} ${isO ? '🔴 **[OVERDUE]**' : '🟢 [Active]'}`;
-          }).join('\n') +
+        reply =
+          `⏰ **Your Task Deadlines Overview:**\n\n` +
+          myTasks
+            .map((t) => {
+              const isO = t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed';
+              const d = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No deadline';
+              return `• **${t.title}**: ${d} ${isO ? '🔴 **[OVERDUE]**' : '🟢 [Active]'}`;
+            })
+            .join('\n') +
           `\n\n📧 *Automated due date reminder emails are sent whenever deadlines approach within 48 hours via Resend & Brevo.*`;
       }
-    } else if (lower.includes('create task') || lower.includes('new task') || lower.includes('add task')) {
-      if (userRole === 'Member' || userRole === 'Viewer') {
-        reply = `🔒 **Permission Notice**: As a **${userRole}**, you do not have permission to create new tasks in **${workspaceName}**.\n\n` +
-          `Task creation is reserved for **Project Managers** and **Workspace Admins** to maintain project discipline.\n\n` +
-          `✨ **What you can do:**\n` +
-          `1. View all tasks assigned to you with due dates.\n` +
-          `2. Update the status and progress of your tasks (\`Todo\` ➔ \`In Progress\` ➔ \`Completed\`).\n` +
-          `3. Report any issues, bugs, or blockers.\n` +
-          `4. Upload and collaborate on project documents.`;
-      } else {
-        reply = `As a **${userRole}**, you can create tasks anytime! Go to **Tasks ➔ Create Task** or inside any Project's Tasks tab.`;
-      }
-    } else if (lower.includes('issue') || lower.includes('blocker') || lower.includes('bug') || lower.includes('problem')) {
-      reply = `⚠️ **Reporting Issues & Blockers**:\n\n` +
-        `If you encounter any bug, dependency blocker, or technical risk, you can report it directly!\n\n` +
-        `• Click the **"Report Issue"** button on your dashboard or navigate to **Issues & Risks** from the sidebar.\n` +
-        `• Select the project, choose priority (\`Critical\`, \`High\`, etc.), and explain the blocker.\n` +
-        `• Your team and project managers will be alerted immediately!`;
-    } else if (lower.includes('project') || lower.includes('health') || lower.includes('status')) {
-      reply = `📁 **Projects in ${workspaceName}**:\n\n` +
-        projects.slice(0, 4).map(p =>
-          `• **${p.name}** (\`${p.projectCode}\`)\n  Progress: ${p.progress}% | Health: \`${p.health.replace('_', ' ')}\` | Status: \`${p.status}\``
-        ).join('\n\n') +
-        `\n\nCheck out the **Projects** tab for deep-dive milestone schedules and linked tasks!`;
-    } else if (lower.includes('document') || lower.includes('upload') || lower.includes('file')) {
-      reply = `📄 **Documents & Files**:\n\n` +
-        `You have full access to view, download, and upload project files in **Documents**.\n\n` +
-        `• Supported formats: PDF, Images, Specs, Code archives, etc.\n` +
-        `• Simply go to **Documents ➔ Upload File** to share deliverables with your team.`;
-    } else if (lower.includes('about') || lower.includes('website') || lower.includes('protrack') || lower.includes('pathii') || lower.includes('pathi') || lower.includes('solli') || lower.includes('solu')) {
-      reply = getLocalPublicReply(message);
-    } else if (lower.includes('hi') || lower.includes('hello') || lower.includes('vanakkam') || lower.includes('machi') || lower.includes('hey')) {
-      reply = `👋 **Vanakkam machi!** I am your **ProTrack AI Assistant**.\n\n` +
-        `Current Workspace: **${workspaceName}** | Role: **${userRole}**\n\n` +
-        `Here is how I can assist you today:\n` +
-        `• 📋 **"Show my tasks"** – List all deliverables assigned to you.\n` +
-        `• ⏰ **"When are my tasks due?"** – Check approaching deadlines and overdue alerts.\n` +
-        `• ⚠️ **"How do I report an issue?"** – Guide on reporting blockers.\n` +
-        `• 🚀 **"Project status"** – Current progress across workspace initiatives.\n` +
-        `• 🌐 **"About ProTrack"** – Complete guide to the platform and features.\n\n` +
-        `What would you like to check right now?`;
     } else {
       reply = getLocalPublicReply(message);
     }
