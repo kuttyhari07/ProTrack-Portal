@@ -1,0 +1,12 @@
+{
+  "name": "protrack-root",
+  "version": "1.0.0",
+  "description": "ProTrack SaaS Project Management & Monitoring System",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "seed": "cd backend && npm run seed",
+    "start:backend": "cd backend && npm run dev",
+    "start:frontend": "cd frontend && npm run dev"
+  }
+}
