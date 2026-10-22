@@ -119,7 +119,7 @@ Default configuration:
 ```env
 PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/protrack
-JWT_SECRET=protrack_super_secret_jwt_key_2026_production_ready
+JWT_SECRET=your_jwt_secret_key_here
 JWT_EXPIRE=7d
 CLIENT_URL=http://localhost:5173
 NODE_ENV=development
@@ -155,17 +155,19 @@ Open your browser to: **`http://localhost:5173`**
 
 ---
 
-## 🔑 Demo Accounts (All Passwords: `ProTrack2026!`)
+## 👥 Role-Based Access Hierarchy
 
-The login screen features 1-click demo buttons to quickly switch between roles:
+ProTrack maintains strict role-based access control (RBAC) to ensure security and project discipline:
 
-| Name | Role | Email | Password | Access Rights |
-| :--- | :--- | :--- | :--- | :--- |
-| **Alex Rivera** | **Workspace Owner** | `alex@protrack.dev` | `ProTrack2026!` | Full admin, ownership, deletion |
-| **Sophia Patel** | **Admin** | `sophia@protrack.dev` | `ProTrack2026!` | Workspace settings, member invites |
-| **Marcus Chen** | **Project Manager** | `marcus@protrack.dev` | `ProTrack2026!` | Project & milestone leader |
-| **Elena Rostova** | **Member** | `elena@protrack.dev` | `ProTrack2026!` | Task & issue contributor |
-| **David Kim** | **Viewer** | `david@protrack.dev` | `ProTrack2026!` | Read-only observation (Mutations blocked) |
+| Role | Access Level | Responsibilities |
+| :--- | :--- | :--- |
+| **Workspace Owner** | Full Organization Control | Workspace settings, billing, member invites, and project deletion |
+| **Admin** | Administrative Access | Workspace configuration, member role management, initiative oversight |
+| **Project Manager** | Planning & Allocation | Project creation, milestone schedules, sprint planning, and task assignment |
+| **Member / Developer** | Delivery & Execution | Viewing assigned deliverables, updating task status, reporting blockers, and uploading docs |
+| **Viewer** | Read-Only Access | Stakeholder observation (mutations strictly blocked server-side) |
+
+Users can create new accounts via the sign-up portal (`/auth/register`) or join an existing organization via email invitations.
 
 ---
 
