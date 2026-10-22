@@ -104,7 +104,16 @@ From the repository root:
 cd backend
 npm install
 
-# Frontend dependenciescd ../frontendnpm install```### 2. Configure Environment VariablesCopy `.env.example` in `backend/`:```bashcd backendcp .env.example .env
+# Frontend dependencies
+cd ../frontend
+npm install
+```
+
+### 2. Configure Environment Variables
+Copy `.env.example` in `backend/`:
+```bash
+cd backend
+cp .env.example .env
 ```
 
 ### 3. Seed Database with Realistic Demo Data
