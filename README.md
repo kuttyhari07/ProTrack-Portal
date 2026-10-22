@@ -104,27 +104,7 @@ From the repository root:
 cd backend
 npm install
 
-# Frontend dependencies
-cd ../frontend
-npm install
-```
-
-### 2. Configure Environment Variables
-Copy `.env.example` in `backend/`:
-```bash
-cd backend
-cp .env.example .env
-```
-Default configuration:
-```env
-PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/protrack
-JWT_SECRET=your_jwt_secret_key_here
-JWT_EXPIRE=7d
-CLIENT_URL=http://localhost:5173
-NODE_ENV=development
-UPLOAD_DIR=uploads
-MAX_FILE_SIZE_MB=25
+# Frontend dependenciescd ../frontendnpm install```### 2. Configure Environment VariablesCopy `.env.example` in `backend/`:```bashcd backendcp .env.example .env
 ```
 
 ### 3. Seed Database with Realistic Demo Data
