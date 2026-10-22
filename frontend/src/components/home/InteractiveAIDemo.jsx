@@ -26,13 +26,23 @@ const InteractiveAIDemo = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const isInitialMount = useRef(true);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   };
 
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     scrollToBottom();
   }, [messages, loading]);
 
@@ -271,7 +281,7 @@ const InteractiveAIDemo = () => {
           </div>
 
           {/* Chat Messages Container */}
-          <div className="p-5 sm:p-6 space-y-4 max-h-[440px] min-h-[300px] overflow-y-auto">
+          <div ref={chatContainerRef} className="p-5 sm:p-6 space-y-4 max-h-[440px] min-h-[300px] overflow-y-auto">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -331,8 +341,6 @@ const InteractiveAIDemo = () => {
                 </div>
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Box */}

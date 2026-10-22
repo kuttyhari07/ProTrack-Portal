@@ -29,12 +29,15 @@ import UserProfile from './pages/profile/UserProfile';
 // Master System Admin Pages
 import AdminRoute from './components/auth/AdminRoute';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   return (
-    <Routes>
-      {/* Public Landing & Home Page */}
-      <Route path="/" element={<LandingPage />} />
+    <>
+      <ScrollToTop />
+      <Routes>
+        {/* Public Landing & Home Page */}
+        <Route path="/" element={<LandingPage />} />
 
       {/* Master System Admin Routes */}
       <Route
@@ -81,7 +84,8 @@ function App() {
       {/* Fallback to Home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
+  </>
+);
 }
 
 export default App;
