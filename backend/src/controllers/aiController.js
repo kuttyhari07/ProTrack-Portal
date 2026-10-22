@@ -3,6 +3,7 @@ const Project = require('../models/Project');
 const Issue = require('../models/Issue');
 const Workspace = require('../models/Workspace');
 const Membership = require('../models/Membership');
+const User = require('../models/User');
 
 /**
  * MASTER PROTRACK PLATFORM KNOWLEDGE BASE
@@ -77,7 +78,7 @@ const PROTRACK_PLATFORM_KNOWLEDGE = `
   * Read-only visibility into roadmaps, boards, and progress summaries.
 
 4. MULTILINGUAL & CONVERSATIONAL INTELLIGENCE:
-- Fluently understands and answers in English, Tamil, and Tanglish (Tamil written in English script, e.g., "machi", "vanakkam", "enna task irukku", "epdi issue report panradhu", "workspace epdi run panradhu", "password epdi mathanum").
+- Fluently understands and answers in English, Tamil, and Tanglish (Tamil written in English script, e.g., "machi", "vanakkam", "enna task irukku", "epdi issue report panradhu", "workspace epdi run panradhu", "password epdi mathanum", "users ellarum name kudu").
 - Always friendly, crisp, polite, structured with clean Markdown bolding and bullet points.
 `;
 
@@ -113,7 +114,7 @@ async function callGemini(systemPrompt, userQuery) {
             ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 800
+              maxOutputTokens: 1000
             }
           })
         }
@@ -144,10 +145,26 @@ async function callGemini(systemPrompt, userQuery) {
  * Highly Dynamic & Comprehensive Local Intelligence Engine
  * Handles EVERY specific question dynamically without repeating boilerplate.
  */
-function getLocalPublicReply(message) {
+function getLocalPublicReply(message, usersList = []) {
   const lower = message.toLowerCase();
 
-  // 1. Password / Profile / Account Settings
+  // 1. Users / Team Members / Names Directory (Specific request)
+  if (lower.includes('user') || lower.includes('member') || lower.includes('team') || lower.includes('name') || lower.includes('ellarum') || lower.includes('aalu') || lower.includes('yaar')) {
+    if (usersList.length > 0) {
+      return `👥 **ProTrack Platform Users Directory (${usersList.length} Total):**\n\n` +
+        usersList.map((u, i) => `${i + 1}. **${u.name}** (\`${u.email}\`) — *${u.role || 'Member'}* (${u.title || 'Contributor'})`).join('\n\n') +
+        `\n\n🛡️ *Admins have full privileges to manage, assign roles, or audit users directly in the Master Admin Console (\`/admin\`).*`;
+    }
+    return `👥 **ProTrack Team Roles & Structure:**\n\n` +
+      `• 🛡️ **Master Admin:** ProTrack Super Admin (\`protrack24@gmail.com\`)\n` +
+      `• 👑 **Workspace Owner:** Alex Rivera (\`alex@protrack.dev\`)\n` +
+      `• 👔 **Project Manager:** Marcus Chen (\`marcus@protrack.dev\`)\n` +
+      `• 💻 **Member / Developer:** Elena Rostova (\`elena@protrack.dev\`) & Sophia Patel\n` +
+      `• 👁️ **Viewer:** David Kim (\`david@protrack.dev\`)\n\n` +
+      `Full live user directories are viewable from the **Admin Console** or inside **Workspace Settings**!`;
+  }
+
+  // 2. Password / Profile / Account Settings
   if (lower.includes('password') || lower.includes('pass') || lower.includes('profile') || lower.includes('account') || lower.includes('settings') || lower.includes('mathanum') || lower.includes('change')) {
     return `🔐 **Password & Account Management in ProTrack:**\n\n` +
       `Machi, unga password-ah change panna indha simple steps follow pannu:\n\n` +
@@ -160,7 +177,7 @@ function getLocalPublicReply(message) {
       `💡 *Password marandhutta na:* Login page-laye **"Forgot Password?"** (\`/auth/forgot-password\`) link irukkum, un email kudutha reset instructions varum.`;
   }
 
-  // 2. Can Members Create Tasks? (Permissions & Role Architecture)
+  // 3. Can Members Create Tasks? (Permissions & Role Architecture)
   if ((lower.includes('create') && lower.includes('task')) || (lower.includes('add') && lower.includes('task')) || lower.includes('mudiyuma') || lower.includes('permission') || lower.includes('role')) {
     return `👥 **ProTrack Role Architecture & Task Permissions:**\n\n` +
       `🔒 **Members can NEVER create new tasks directly** in ProTrack! Idhoda main reason:\n` +
@@ -174,7 +191,7 @@ function getLocalPublicReply(message) {
       `5. Work stress-free without scope changes!`;
   }
 
-  // 3. Tasks & Deliverables Management
+  // 4. Tasks & Deliverables Management
   if (lower.includes('task') || lower.includes('velai') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending') || lower.includes('deliverable')) {
     return `📋 **Task Management in ProTrack:**\n\n` +
       `• **Global Task Registry (\`/tasks\`):** Workspace-la irukura ella tasks-ayum priority (*Low, Medium, High, Urgent, Critical*), status (*Todo, In Progress, Review, Completed*), and assignee vechi filter pannalaam.\n` +
@@ -183,7 +200,7 @@ function getLocalPublicReply(message) {
       `• **Activity Audit:** Every update is logged in real-time.`;
   }
 
-  // 4. Deadlines & Automated Email Reminders
+  // 5. Deadlines & Automated Email Reminders
   if (lower.includes('due') || lower.includes('deadline') || lower.includes('date') || lower.includes('overdue') || lower.includes('alert') || lower.includes('email') || lower.includes('notification')) {
     return `⏰ **Automated Deadline Protection & Email Notifications:**\n\n` +
       `ProTrack un team deliverables miss aagama paathukollum:\n\n` +
@@ -192,7 +209,7 @@ function getLocalPublicReply(message) {
       `3. **Team Notifications:** Notification bell icon-la real-time updates and invitations display aagum.`;
   }
 
-  // 5. Agile Kanban Sprint Board
+  // 6. Agile Kanban Sprint Board
   if (lower.includes('kanban') || lower.includes('sprint') || lower.includes('board') || lower.includes('column') || lower.includes('drag') || lower.includes('drop')) {
     return `📌 **Agile Kanban Sprint Board (\`/kanban\`):**\n\n` +
       `ProTrack features an interactive drag-and-drop board across 5 engineering stages:\n` +
@@ -204,7 +221,7 @@ function getLocalPublicReply(message) {
       `Cards include priority badges, assignee avatars, subtask counters, and WIP control limits!`;
   }
 
-  // 6. Issues & Blocker Registry
+  // 7. Issues & Blocker Registry
   if (lower.includes('issue') || lower.includes('blocker') || lower.includes('bug') || lower.includes('problem') || lower.includes('error') || lower.includes('prachanai')) {
     return `⚠️ **Issues & Blocker Management (\`/issues\`):**\n\n` +
       `Developers or leads can report project impediments immediately:\n` +
@@ -214,7 +231,7 @@ function getLocalPublicReply(message) {
       `• **Resolution Tracking:** Track status from \`Open\` ➔ \`In Progress\` ➔ \`Resolved\`.`;
   }
 
-  // 7. Projects & Milestone Scheduling
+  // 8. Projects & Milestone Scheduling
   if (lower.includes('project') || lower.includes('milestone') || lower.includes('timeline') || lower.includes('schedule') || lower.includes('roadmap')) {
     return `🚀 **Projects & Milestone Scheduling (\`/projects\`):**\n\n` +
       `• **Project Hub:** Create initiatives, set target launch dates, and track overall completion percentages.\n` +
@@ -222,7 +239,7 @@ function getLocalPublicReply(message) {
       `• **Milestone Targets:** Group tasks under key sprint deliverables and track progress bars as tasks finish.`;
   }
 
-  // 8. Documents & File Uploads
+  // 9. Documents & File Uploads
   if (lower.includes('document') || lower.includes('file') || lower.includes('upload') || lower.includes('pdf') || lower.includes('share') || lower.includes('attachment')) {
     return `📁 **Document Repository (\`/documents\`):**\n\n` +
       `• **Centralized Storage:** Upload specs, architecture diagrams, product briefs, and code deliverables directly.\n` +
@@ -230,7 +247,7 @@ function getLocalPublicReply(message) {
       `• **Capacity:** Up to 25MB per file with verified disk storage and secure downloads.`;
   }
 
-  // 9. Pricing & Razorpay Licensing
+  // 10. Pricing & Razorpay Licensing
   if (lower.includes('pricing') || lower.includes('cost') || lower.includes('price') || lower.includes('fees') || lower.includes('pay') || lower.includes('razorpay') || lower.includes('panam') || lower.includes('evlo')) {
     return `💳 **ProTrack Transparent Commercial Licensing:**\n\n` +
       `• **Free Community Tier:** Complete access to Kanban boards, task tracking, documents, and built-in AI copilot.\n` +
@@ -239,7 +256,7 @@ function getLocalPublicReply(message) {
       `• No hidden monthly subscription traps! Official tax invoice receipts provided for every transaction.`;
   }
 
-  // 10. Master Admin Console
+  // 11. Master Admin Console
   if (lower.includes('admin') || lower.includes('protrack24') || lower.includes('superadmin') || lower.includes('console')) {
     return `🛡️ **Master Admin Console (\`/admin\`):**\n\n` +
       `• **Admin Account:** \`protrack24@gmail.com\`\n` +
@@ -249,7 +266,7 @@ function getLocalPublicReply(message) {
       `  - Server telemetry, MongoDB status, and audit logs.`;
   }
 
-  // 11. User Feedback System
+  // 12. User Feedback System
   if (lower.includes('feedback') || lower.includes('review') || lower.includes('rating') || lower.includes('star') || lower.includes('karuthu')) {
     return `💬 **Integrated Feedback System:**\n\n` +
       `• Anyone can submit feedback by clicking the **"Feedback"** button in the top navigation or floating bottom widget.\n` +
@@ -257,7 +274,7 @@ function getLocalPublicReply(message) {
       `• Submissions immediately appear on the **Master Admin Console** for administrative action!`;
   }
 
-  // 12. Onboarding & Workspace Setup
+  // 13. Onboarding & Workspace Setup
   if (lower.includes('onboarding') || lower.includes('create workspace') || lower.includes('setup') || lower.includes('new workspace') || lower.includes('invite')) {
     return `🧭 **Guided Onboarding Wizard (\`/onboarding\`):**\n\n` +
       `Getting started is seamless in 3 quick steps:\n` +
@@ -266,7 +283,7 @@ function getLocalPublicReply(message) {
       `3. **Invite Team:** Add member emails with assigned roles and jump right into the workspace dashboard!`;
   }
 
-  // 13. Reports & CSV Export
+  // 14. Reports & CSV Export
   if (lower.includes('report') || lower.includes('analytic') || lower.includes('csv') || lower.includes('export') || lower.includes('download data') || lower.includes('velocity')) {
     return `📊 **Reports & Analytics (\`/reports\`):**\n\n` +
       `• **Team Velocity:** Visual gauges for sprint completion rates and aggregate team progress.\n` +
@@ -274,11 +291,12 @@ function getLocalPublicReply(message) {
       `• **1-Click CSV Exports:** Export all project deliverables and task records directly to Excel/CSV for offline analysis.`;
   }
 
-  // 14. Greetings
+  // 15. Greetings
   if (lower.includes('hi') || lower.includes('hello') || lower.includes('vanakkam') || lower.includes('machi') || lower.includes('hey') || lower.includes('good morning') || lower.includes('good evening')) {
     return `👋 **Vanakkam machi! Welcome to ProTrack!**\n\n` +
       `I am your **ProTrack AI Assistant**, trained with complete knowledge of the entire website.\n\n` +
       `Enna query irundhaalum kekalaam:\n` +
+      `• 👥 *"Users ellarum name kudu"*\n` +
       `• 📋 *"How do I track my assigned tasks?"*\n` +
       `• 🔐 *"Password epdi change panradhu?"*\n` +
       `• 👥 *"Why can't members create tasks?"*\n` +
@@ -287,7 +305,7 @@ function getLocalPublicReply(message) {
       `Ask me in English or Tanglish machi!`;
   }
 
-  // 15. General Overview & What is ProTrack
+  // 16. General Overview & What is ProTrack
   if (lower.includes('what is') || lower.includes('about') || lower.includes('protrack') || lower.includes('website') || lower.includes('solli') || lower.includes('solu') || lower.includes('pathi') || lower.includes('feature')) {
     return `🌟 **About ProTrack — Plan Smarter. Track Progress. Deliver Better.**\n\n` +
       `**ProTrack** is a high-velocity project management and sprint tracking SaaS platform designed specifically for software engineering teams, startups, and product managers.\n\n` +
@@ -326,14 +344,28 @@ const publicChatWithAI = async (req, res, next) => {
       });
     }
 
+    // Fetch registered users preview so even public chat knows real users
+    const registeredUsers = await User.find({}).select('name email role title').limit(15);
+    const userDirectory = registeredUsers.map(
+      (u, i) => `${i + 1}. ${u.name} (${u.email}) - Role: ${u.role || 'Member'} (${u.title || 'Contributor'})`
+    ).join('\n');
+
     const systemPrompt = `You are ProTrack AI, the official intelligent assistant for the ProTrack SaaS project management platform.
 You are interacting with a user or visitor exploring the ProTrack website.
 Answer accurately based on the platform knowledge base below.
 
 ${PROTRACK_PLATFORM_KNOWLEDGE}
 
+REGISTERED PLATFORM USERS IN DATABASE (${registeredUsers.length} Users):
+${userDirectory}
+
+CRITICAL DIRECTORY LOOKUP RULE:
+- If the user asks for users, members, or names (e.g., "users ellarum name uh kudu", "who are the registered users?", "list all user names"):
+  YOU MUST DIRECTLY LIST OUT THE ACTUAL NAMES, EMAILS, AND ROLES OF THE USERS LISTED ABOVE!
+  DO NOT JUST TELL THEM TO GO TO /admin. DIRECTLY DISPLAY THEIR NAMES AND ROLES CLEARLY IN A BULLETED OR NUMBERED LIST!
+
 CONVERSATIONAL GUIDELINES:
-1. If the user asks in Tamil or Tanglish (e.g., "machi website pathi sollu", "password epdi change panradhu", "features enna", "kanban epdi work aagum"), respond warmly in natural, friendly Tanglish/English.
+1. If the user asks in Tamil or Tanglish (e.g., "machi website pathi sollu", "password epdi change panradhu", "features enna", "kanban epdi work aagum", "users ellarum name kudu"), respond warmly in natural, friendly Tanglish/English.
 2. Provide clear, structured explanations with markdown bullet points and bold highlights.
 3. Highlight ProTrack's key value propositions: Clean separation between PM (planning) and Member (execution), automated 48h deadline email alerts, interactive Kanban boards, built-in AI copilot, and seamless Razorpay licensing.
 4. Keep responses crisp, professional, helpful, and specifically answer what the user asked.`;
@@ -347,8 +379,8 @@ CONVERSATIONAL GUIDELINES:
       });
     }
 
-    // Dynamic local fallback engine
-    const reply = getLocalPublicReply(message);
+    // Dynamic local fallback engine with database users
+    const reply = getLocalPublicReply(message, registeredUsers);
     return res.json({
       success: true,
       reply,
@@ -377,9 +409,10 @@ const chatWithAI = async (req, res, next) => {
 
     const workspaceId = req.workspaceId;
     const user = req.user;
+    const isSuperAdmin = user.role === 'system_admin' || user.email?.toLowerCase() === 'protrack24@gmail.com';
 
-    // 1. Fetch relevant workspace context
-    const [workspace, membership, myTasks, projects, openIssues] = await Promise.all([
+    // 1. Fetch relevant workspace context & team members from live database
+    const [workspace, membership, myTasks, projects, openIssues, teamMembers, allPlatformUsers] = await Promise.all([
       Workspace.findById(workspaceId).select('name description teamType'),
       Membership.findOne({ workspace: workspaceId, user: user._id }).select('role'),
       Task.find({ workspace: workspaceId, assignee: user._id })
@@ -392,7 +425,13 @@ const chatWithAI = async (req, res, next) => {
       Issue.find({ workspace: workspaceId, status: { $in: ['open', 'in_progress'] } })
         .populate('project', 'name')
         .sort({ priority: 1 })
-        .limit(5)
+        .limit(5),
+      Membership.find({ workspace: workspaceId })
+        .populate('user', 'name email role title')
+        .sort({ role: 1 }),
+      isSuperAdmin
+        ? User.find({}).select('name email role title createdAt').sort({ createdAt: -1 })
+        : Promise.resolve([])
     ]);
 
     const userRole = membership?.role || 'Member';
@@ -414,7 +453,15 @@ const chatWithAI = async (req, res, next) => {
       (i) => `- [${i.priority.toUpperCase()}] "${i.title}" in ${i.project?.name || 'Project'} (Status: ${i.status})`
     );
 
-    // 2. Try Gemini API with complete platform knowledge & user workspace context
+    const memberSummaries = teamMembers.map(
+      (m, idx) => `${idx + 1}. ${m.user?.name || 'Unnamed'} (${m.user?.email || 'No email'}) - Role: ${m.role} - Title: ${m.user?.title || 'Contributor'}`
+    );
+
+    const platformUserSummaries = allPlatformUsers.map(
+      (u, idx) => `${idx + 1}. ${u.name} (${u.email}) - Platform Role: ${u.role || 'User'} - Title: ${u.title || 'Member'}`
+    );
+
+    // 2. Try Gemini API with complete platform knowledge, live database users, and user workspace context
     const systemPrompt = `You are ProTrack AI, an intelligent, helpful, and polite assistant embedded inside the ProTrack SaaS project management platform.
 Current User: ${user.name} (Email: ${user.email}, Role: ${userRole}).
 Active Workspace: "${workspaceName}".
@@ -431,11 +478,24 @@ ${projectSummaries.length > 0 ? projectSummaries.join('\n') : 'No active project
 Top Unresolved Issues / Blockers:
 ${issueSummaries.length > 0 ? issueSummaries.join('\n') : 'No open blockers.'}
 
+CURRENT WORKSPACE TEAM MEMBERS (${teamMembers.length} Members):
+${memberSummaries.length > 0 ? memberSummaries.join('\n') : 'No other members in this workspace.'}
+
+${isSuperAdmin && allPlatformUsers.length > 0 ? `
+ALL REGISTERED PLATFORM USERS (${allPlatformUsers.length} Users in MongoDB - Super Admin Access):
+${platformUserSummaries.join('\n')}
+` : ''}
+
+CRITICAL DIRECTORY LOOKUP RULE:
+- If the user asks for users, team members, or names (e.g. "users ellarum name uh kudu", "show team members", "who is in this workspace?", "list all users"):
+  YOU MUST DIRECTLY LIST OUT THE NAMES, EMAILS, AND ROLES OF THE USERS IN A BEAUTIFULLY FORMATTED NUMBERED LIST RIGHT HERE IN YOUR RESPONSE!
+  DO NOT JUST TELL THEM TO GO TO /admin. DIRECTLY DISPLAY THEIR NAMES AND ROLES!
+
 PLATFORM RULES TO ENFORCE:
 1. If the user is a Member (role: Member):
    - Members cannot create new tasks. Task creation is done by Project Managers, Admins, or the Owner.
    - Members focus on viewing assigned tasks, monitoring due dates, updating task status/progress, reporting issues/blockers, and uploading documents.
-2. If asked in Tamil or Tanglish (e.g. "enna task irukku", "due date enna", "password epdi mathanum"), respond naturally in warm, friendly Tanglish/English.
+2. If asked in Tamil or Tanglish (e.g. "users ellarum name kudu", "enna task irukku", "due date enna", "password epdi mathanum"), respond naturally in warm, friendly Tanglish/English.
 3. Keep replies crisp, structured with markdown bolding, bullet points, and actionable steps.`;
 
     const geminiReply = await callGemini(systemPrompt, message);
@@ -454,7 +514,20 @@ PLATFORM RULES TO ENFORCE:
     const overdueCount = myTasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed').length;
     const pendingCount = myTasks.filter((t) => t.status !== 'completed').length;
 
-    if (lower.includes('task') || lower.includes('ennaku') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending') || lower.includes('velai')) {
+    // Users / Team directory check
+    if (lower.includes('user') || lower.includes('member') || lower.includes('team') || lower.includes('name') || lower.includes('ellarum') || lower.includes('aalu') || lower.includes('yaar')) {
+      if (isSuperAdmin && allPlatformUsers.length > 0) {
+        reply = `👥 **All Registered Platform Users Directory (${allPlatformUsers.length} Total):**\n\n` +
+          allPlatformUsers.map((u, i) => `${i + 1}. **${u.name}** (\`${u.email}\`) — *${u.role || 'User'}* (${u.title || 'Member'})`).join('\n\n') +
+          `\n\n🛡️ *Super Admin Access: You can manage, toggle roles, or audit any of these users directly in the Master Admin Console (\`/admin\`).*`;
+      } else if (teamMembers.length > 0) {
+        reply = `👥 **Team Members in ${workspaceName} (${teamMembers.length} Members):**\n\n` +
+          teamMembers.map((m, i) => `${i + 1}. **${m.user?.name || 'Unnamed'}** (\`${m.user?.email}\`) — *${m.role}* (${m.user?.title || 'Contributor'})`).join('\n\n') +
+          `\n\n💡 *Project Managers and Workspace Owners can manage roles or invite new teammates from Workspace Settings.*`;
+      } else {
+        reply = `Currently, there are no other members in **${workspaceName}**. You can invite teammates from **Workspace Settings**!`;
+      }
+    } else if (lower.includes('task') || lower.includes('ennaku') || lower.includes('work') || lower.includes('assigned') || lower.includes('pending') || lower.includes('velai')) {
       if (myTasks.length === 0) {
         reply = `Hello **${user.name}**! You currently do not have any tasks assigned to you in **${workspaceName}**.\n\nOnce a Project Manager or Admin assigns a task to you, it will appear right on your dashboard with its deadline!`;
       } else {
@@ -490,7 +563,7 @@ PLATFORM RULES TO ENFORCE:
           `\n\n📧 *Automated due date reminder emails are sent whenever deadlines approach within 48 hours via Resend & Brevo.*`;
       }
     } else {
-      reply = getLocalPublicReply(message);
+      reply = getLocalPublicReply(message, allPlatformUsers.length > 0 ? allPlatformUsers : teamMembers.map((m) => m.user));
     }
 
     res.json({
