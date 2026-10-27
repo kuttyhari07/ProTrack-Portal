@@ -24,7 +24,8 @@ import {
   Clock,
   Trash2,
   CheckCircle2,
-  BellRing
+  BellRing,
+  Edit2
 } from 'lucide-react';
 
 const GlobalTaskList = () => {
@@ -63,6 +64,23 @@ const GlobalTaskList = () => {
     status: 'todo',
     dueDate: '',
     assigneeId: ''
+  });
+
+  // Edit & Delete Task State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [taskEditForm, setTaskEditForm] = useState({
+    id: '',
+    projectId: '',
+    title: '',
+    description: '',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: '',
+    assigneeId: '',
+    progress: 0,
+    labels: ''
   });
 
   const fetchTasks = async () => {
@@ -183,6 +201,80 @@ const GlobalTaskList = () => {
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenEditTask = (task) => {
+    setTaskEditForm({
+      id: task._id,
+      projectId: task.project?._id || task.project,
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority || 'medium',
+      status: task.status || 'todo',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+      assigneeId: task.assignee?._id || task.assignee || '',
+      progress: task.progress || 0,
+      labels: Array.isArray(task.labels) ? task.labels.join(', ') : ''
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const labelsArray = taskEditForm.labels
+        ? taskEditForm.labels.split(',').map((l) => l.trim()).filter(Boolean)
+        : [];
+      const res = await api.put(`/tasks/${taskEditForm.id}`, {
+        title: taskEditForm.title,
+        description: taskEditForm.description,
+        priority: taskEditForm.priority,
+        status: taskEditForm.status,
+        dueDate: taskEditForm.dueDate || null,
+        assigneeId: taskEditForm.assigneeId || null,
+        progress: Number(taskEditForm.progress),
+        labels: labelsArray
+      });
+      if (res.data.success) {
+        setTasks((prev) =>
+          prev.map((t) => (t._id === taskEditForm.id ? res.data.task : t))
+        );
+        if (activeTask?._id === taskEditForm.id) {
+          setActiveTask(res.data.task);
+        }
+        setEditModalOpen(false);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenDeleteTask = (task) => {
+    setTaskToDelete(task);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setSubmitting(true);
+    try {
+      const res = await api.delete(`/tasks/${taskToDelete._id}`);
+      if (res.data.success) {
+        setTasks((prev) => prev.filter((t) => t._id !== taskToDelete._id));
+        if (activeTask?._id === taskToDelete._id) {
+          setActiveTask(null);
+        }
+        setDeleteConfirmOpen(false);
+        setTaskToDelete(null);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete task');
     } finally {
       setSubmitting(false);
     }
@@ -468,13 +560,36 @@ const GlobalTaskList = () => {
                       {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTask(task)}
-                        className="p-1 text-gray-400 hover:text-[#4F46E5] rounded"
-                      >
-                        <MessageSquare className="w-4 h-4 inline" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTask(task)}
+                          className="p-1.5 text-gray-400 hover:text-[#4F46E5] hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded transition-colors"
+                          title="View comments & discussion"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                        {!isViewer && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditTask(task)}
+                              className="p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded transition-colors"
+                              title="Edit task"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeleteTask(task)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
+                              title="Delete task"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -511,7 +626,35 @@ const GlobalTaskList = () => {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-gray-400">#{task.taskNumber}</span>
-                        <Badge variant={task.priority}>{task.priority}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={task.priority}>{task.priority}</Badge>
+                          {!isViewer && (
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditTask(task);
+                                }}
+                                className="p-1 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                title="Edit task"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenDeleteTask(task);
+                                }}
+                                className="p-1 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                title="Delete task"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <h4 className="font-semibold text-[#172033] dark:text-[#F3F4F6] line-clamp-2">
@@ -654,6 +797,146 @@ const GlobalTaskList = () => {
         </form>
       </Modal>
 
+      {/* EDIT TASK MODAL */}
+      <Modal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title="Edit Task"
+        subtitle="Update deliverables, schedule, priority, and assignees."
+      >
+        <form onSubmit={handleUpdateTask} className="space-y-4">
+          <Input
+            label="Task Title"
+            value={taskEditForm.title}
+            onChange={(e) => setTaskEditForm({ ...taskEditForm, title: e.target.value })}
+            required
+          />
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#9CA3AF] mb-1.5">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              value={taskEditForm.description}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, description: e.target.value })}
+              className="block w-full rounded-lg border border-[#E4E7EC] dark:border-[#374151] bg-white dark:bg-[#111827] text-sm text-[#172033] dark:text-[#F3F4F6] p-3 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Priority"
+              value={taskEditForm.priority}
+              options={[
+                { value: 'urgent', label: 'Urgent' },
+                { value: 'high', label: 'High' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'low', label: 'Low' }
+              ]}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, priority: e.target.value })}
+            />
+            <Select
+              label="Assignee"
+              value={taskEditForm.assigneeId}
+              options={[
+                { value: '', label: 'Unassigned' },
+                ...members.map((m) => ({ value: m.userId, label: m.name }))
+              ]}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, assigneeId: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Status"
+              value={taskEditForm.status}
+              options={[
+                { value: 'todo', label: 'To Do' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'in_review', label: 'In Review' },
+                { value: 'completed', label: 'Completed' }
+              ]}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, status: e.target.value })}
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={taskEditForm.dueDate}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, dueDate: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#9CA3AF]">
+                Completion Progress
+              </label>
+              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                {taskEditForm.progress}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={taskEditForm.progress}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, progress: Number(e.target.value) })}
+              className="w-full accent-indigo-600 cursor-pointer"
+            />
+          </div>
+
+          <Input
+            label="Tags / Labels (comma-separated)"
+            placeholder="Frontend, Bug, High-Priority"
+            value={taskEditForm.labels}
+            onChange={(e) => setTaskEditForm({ ...taskEditForm, labels: e.target.value })}
+          />
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-[#E4E7EC] dark:border-[#374151]">
+            <Button variant="outline" type="button" onClick={() => setEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={submitting}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* DELETE TASK CONFIRMATION MODAL */}
+      <Modal
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Delete Task"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-[#667085] dark:text-[#9CA3AF]">
+            Are you sure you want to delete task{' '}
+            <strong className="text-gray-900 dark:text-white">
+              #{taskToDelete?.taskNumber}: {taskToDelete?.title}
+            </strong>
+            ? This action cannot be undone and will remove all associated comments and tracking data.
+          </p>
+
+          <div className="pt-3 flex justify-end gap-3 border-t border-[#E4E7EC] dark:border-[#374151]">
+            <Button variant="outline" type="button" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              loading={submitting}
+              onClick={handleConfirmDeleteTask}
+            >
+              Delete Task
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* TASK COMMENTS & DRAWER MODAL */}
       {activeTask && (
         <Modal
@@ -663,12 +946,41 @@ const GlobalTaskList = () => {
           maxWidth="max-w-2xl"
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Badge variant={activeTask.status}>{activeTask.status}</Badge>
-              <Badge variant={activeTask.priority}>{activeTask.priority}</Badge>
-              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                {activeTask.project?.name}
-              </span>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant={activeTask.status}>{activeTask.status}</Badge>
+                <Badge variant={activeTask.priority}>{activeTask.priority}</Badge>
+                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                  {activeTask.project?.name}
+                </span>
+                {activeTask.dueDate && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Due: {new Date(activeTask.dueDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              {!isViewer && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    icon={Edit2}
+                    onClick={() => handleOpenEditTask(activeTask)}
+                  >
+                    Edit Task
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => handleOpenDeleteTask(activeTask)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Status & Progress Controller for Team Member */}

@@ -53,9 +53,39 @@ const seedAdminUser = async () => {
         admin.status = 'active';
         modified = true;
       }
+
+      // Ensure Admin Workspace exists
+      let workspace = await Workspace.findOne({ owner: admin._id });
+      if (!workspace) {
+        const wsSlug = `protrack-hq-${Math.floor(1000 + Math.random() * 9000)}`;
+        workspace = await Workspace.create({
+          name: 'ProTrack HQ',
+          slug: wsSlug,
+          owner: admin._id,
+          teamType: 'Product Engineering'
+        });
+        console.log(`[Admin Seeder] Re-created missing HQ workspace for ${adminEmail}`);
+      }
+
+      // Ensure Owner Membership exists
+      let membership = await Membership.findOne({ user: admin._id, workspace: workspace._id });
+      if (!membership) {
+        await Membership.create({
+          user: admin._id,
+          workspace: workspace._id,
+          role: 'Owner'
+        });
+        console.log(`[Admin Seeder] Re-created missing Owner membership for ${adminEmail}`);
+      }
+
+      if (!admin.currentWorkspace || admin.currentWorkspace.toString() !== workspace._id.toString()) {
+        admin.currentWorkspace = workspace._id;
+        modified = true;
+      }
+
       if (modified) {
         await admin.save();
-        console.log(`[Admin Seeder] Verified and updated ${adminEmail} privileges to system_admin`);
+        console.log(`[Admin Seeder] Verified and updated ${adminEmail} privileges and workspace`);
       }
     }
 

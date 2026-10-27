@@ -9,7 +9,8 @@ const {
   deleteProject,
   getProjectHealth,
   getProjectAISummary,
-  getProjectAIRiskInsights
+  getProjectAIRiskInsights,
+  getProjectReportData
 } = require('../controllers/projectController');
 const { protect } = require('../middleware/auth');
 const { requireWorkspaceMember, restrictViewerMutations, requireRoles } = require('../middleware/workspace');
@@ -19,6 +20,7 @@ router.use(requireWorkspaceMember);
 
 router.get('/', getProjects);
 router.get('/:id', getProjectById);
+router.get('/:id/report', getProjectReportData);
 router.get('/:id/health', getProjectHealth);
 router.post('/:id/ai-summary', getProjectAISummary);
 router.post('/:id/ai-risk-insights', getProjectAIRiskInsights);

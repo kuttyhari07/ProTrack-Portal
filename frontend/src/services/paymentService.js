@@ -123,7 +123,8 @@ export const initiateProjectPayment = async ({
       }
     }
   } catch (err) {
-    console.error('Payment initiation error:', err);
-    onError && onError(err);
+    const errorMsg = err.response?.data?.message || err.message || 'Payment initiation failed';
+    console.error('Payment initiation error:', errorMsg, err);
+    onError && onError(new Error(errorMsg));
   }
 };

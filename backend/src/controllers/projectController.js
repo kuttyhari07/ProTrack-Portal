@@ -388,6 +388,115 @@ const getProjectAIRiskInsights = async (req, res, next) => {
   }
 };
 
+// @desc    Get aggregated project report data for export (PDF / DOC)
+// @route   GET /api/projects/:id/report
+// @access  Private (Owner, Admin, Project Manager or Project Owner)
+const getProjectReportData = async (req, res, next) => {
+  try {
+    const project = await Project.findOne({
+      _id: req.params.id,
+      workspace: req.workspaceId
+    })
+      .populate('owner', 'name email avatar title')
+      .populate('members.user', 'name email avatar title');
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found in this workspace'
+      });
+    }
+
+    // Check authorization: Owner, Admin, Project Manager, or Project Owner
+    const isAuthorized =
+      ['Owner', 'Admin', 'Project Manager'].includes(req.userRole) ||
+      (project.owner && project.owner._id.toString() === req.user._id.toString()) ||
+      ['admin', 'superadmin'].includes(req.user.role);
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied. Only Project Managers, Workspace Admins, and Project Owners can download project reports.'
+      });
+    }
+
+    // Fetch related records in parallel
+    const [tasks, milestones, issues, healthData] = await Promise.all([
+      Task.find({ project: project._id })
+        .populate('assignee', 'name email avatar')
+        .populate('creator', 'name email')
+        .sort({ status: 1, dueDate: 1 }),
+      Milestone.find({ project: project._id }).sort({ dueDate: 1 }),
+      Issue.find({ project: project._id })
+        .populate('assignee', 'name email')
+        .populate('reporter', 'name email')
+        .sort({ priority: -1, createdAt: -1 }),
+      evaluateProjectHealth(project._id)
+    ]);
+
+    // Compute task breakdown
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+    const inProgressTasks = tasks.filter((t) => t.status === 'in_progress').length;
+    const inReviewTasks = tasks.filter((t) => t.status === 'in_review').length;
+    const todoTasks = tasks.filter((t) => t.status === 'todo').length;
+    const now = new Date();
+    const overdueTasks = tasks.filter(
+      (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed'
+    );
+
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : (project.progress || 0);
+
+    // Compute milestone stats
+    const totalMilestones = milestones.length;
+    const completedMilestones = milestones.filter((m) => m.status === 'completed').length;
+
+    // Compute issue stats
+    const totalIssues = issues.length;
+    const openIssues = issues.filter((i) => ['open', 'in_progress'].includes(i.status)).length;
+    const criticalIssues = issues.filter((i) => i.priority === 'critical' && i.status !== 'closed').length;
+
+    res.json({
+      success: true,
+      report: {
+        project,
+        workspace: {
+          _id: req.workspace._id,
+          name: req.workspace.name,
+          slug: req.workspace.slug
+        },
+        generatedBy: {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.userRole || req.user.role
+        },
+        generatedAt: new Date().toISOString(),
+        healthData,
+        stats: {
+          totalTasks,
+          completedTasks,
+          inProgressTasks,
+          inReviewTasks,
+          todoTasks,
+          overdueTasksCount: overdueTasks.length,
+          completionRate,
+          totalMilestones,
+          completedMilestones,
+          totalIssues,
+          openIssues,
+          criticalIssues
+        },
+        tasks,
+        milestones,
+        issues
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProjects,
   getProjectById,
@@ -397,5 +506,6 @@ module.exports = {
   deleteProject,
   getProjectHealth,
   getProjectAISummary,
-  getProjectAIRiskInsights
+  getProjectAIRiskInsights,
+  getProjectReportData
 };

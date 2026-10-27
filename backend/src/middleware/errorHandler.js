@@ -5,6 +5,14 @@ const errorHandler = (err, req, res, next) => {
   // Log in development
   if (process.env.NODE_ENV !== 'production') {
     console.error('[API Error]:', err);
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      fs.appendFileSync(
+        path.join(__dirname, '../../api_errors.log'),
+        `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}\n${err.stack || err}\n\n`
+      );
+    } catch (e) {}
   }
 
   // Mongoose bad ObjectId

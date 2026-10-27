@@ -32,8 +32,15 @@ import {
   Sparkles,
   ExternalLink,
   ChevronRight,
-  Edit2
+  Edit2,
+  FileDown,
+  Printer
 } from 'lucide-react';
+import ProjectReportModal from '../../components/projects/ProjectReportModal';
+import {
+  downloadProjectReportPDF,
+  downloadProjectReportDOC
+} from '../../utils/projectReportGenerator';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -41,7 +48,7 @@ const ProjectDetail = () => {
   const initialTab = searchParams.get('tab') || 'overview';
 
   const { user } = useAuth();
-  const { isViewer, isOwnerOrAdmin, isManagerOrAdmin } = useWorkspace();
+  const { currentWorkspace, isViewer, isOwnerOrAdmin, isManagerOrAdmin } = useWorkspace();
 
   const [project, setProject] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -61,6 +68,7 @@ const ProjectDetail = () => {
   const [issues, setIssues] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
 
   // Modals
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -78,6 +86,22 @@ const ProjectDetail = () => {
     status: 'todo',
     dueDate: '',
     assigneeId: ''
+  });
+
+  // Task Edit & Delete State
+  const [editTaskModalOpen, setEditTaskModalOpen] = useState(false);
+  const [deleteTaskConfirmOpen, setDeleteTaskConfirmOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [taskEditForm, setTaskEditForm] = useState({
+    id: '',
+    title: '',
+    description: '',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: '',
+    assigneeId: '',
+    progress: 0,
+    labels: ''
   });
 
   const [milestoneForm, setMilestoneForm] = useState({
@@ -101,6 +125,17 @@ const ProjectDetail = () => {
   // Selected task drawer for viewing/adding comments
   const [activeTask, setActiveTask] = useState(null);
   const [newComment, setNewComment] = useState('');
+
+  // Project Report Export State
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState(null);
+
+  // Permission: Project Manager, Workspace Admin, Owner or Project Creator
+  const canDownloadReport =
+    isManagerOrAdmin ||
+    project?.owner?._id === user?._id ||
+    project?.owner === user?._id ||
+    ['admin', 'superadmin'].includes(user?.role);
 
   // AI & Health Insights State
   const [healthData, setHealthData] = useState(null);
@@ -154,6 +189,38 @@ const ProjectDetail = () => {
     fetchProjectData();
   }, [id]);
 
+  const fetchWorkspaceMembers = async () => {
+    if (!currentWorkspace?._id) return;
+    try {
+      const res = await api.get(`/workspaces/${currentWorkspace._id}/members`);
+      if (res.data.success) {
+        setWorkspaceMembers(res.data.members || []);
+      }
+    } catch (err) {
+      console.error('Failed to load workspace members:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkspaceMembers();
+  }, [currentWorkspace?._id]);
+
+  const assigneeOptions = [
+    { value: '', label: 'Unassigned' },
+    ...(workspaceMembers.length > 0
+      ? workspaceMembers.map((m) => ({
+          value: m.user?._id || m.userId || m.user,
+          label: `${m.user?.name || m.name || 'Member'} (${m.role || 'Member'})`
+        }))
+      : [
+          ...(project?.owner ? [{ value: project.owner._id || project.owner, label: `${project.owner.name || 'Project Lead'} (Owner)` }] : []),
+          ...(project?.members || []).map((m) => ({
+            value: m.user?._id || m.user,
+            label: m.user?.name || 'Contributor'
+          }))
+        ])
+  ];
+
   // Quick update task status
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
     try {
@@ -196,6 +263,83 @@ const ProjectDetail = () => {
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenEditTask = (task) => {
+    setTaskEditForm({
+      id: task._id,
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority || 'medium',
+      status: task.status || 'todo',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+      assigneeId: task.assignee?._id || task.assignee || '',
+      progress: task.progress || 0,
+      labels: Array.isArray(task.labels) ? task.labels.join(', ') : ''
+    });
+    setEditTaskModalOpen(true);
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const labelsArray = taskEditForm.labels
+        ? taskEditForm.labels.split(',').map((l) => l.trim()).filter(Boolean)
+        : [];
+      const res = await api.put(`/tasks/${taskEditForm.id}`, {
+        title: taskEditForm.title,
+        description: taskEditForm.description,
+        priority: taskEditForm.priority,
+        status: taskEditForm.status,
+        dueDate: taskEditForm.dueDate || null,
+        assigneeId: taskEditForm.assigneeId || null,
+        progress: Number(taskEditForm.progress),
+        labels: labelsArray
+      });
+      if (res.data.success) {
+        setTasks((prev) =>
+          prev.map((t) => (t._id === taskEditForm.id ? res.data.task : t))
+        );
+        if (activeTask?._id === taskEditForm.id) {
+          setActiveTask(res.data.task);
+        }
+        setEditTaskModalOpen(false);
+        const pRes = await api.get(`/projects/${id}`);
+        if (pRes.data.success) setProject(pRes.data.project);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenDeleteTask = (task) => {
+    setTaskToDelete(task);
+    setDeleteTaskConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setSubmitting(true);
+    try {
+      const res = await api.delete(`/tasks/${taskToDelete._id}`);
+      if (res.data.success) {
+        setTasks((prev) => prev.filter((t) => t._id !== taskToDelete._id));
+        if (activeTask?._id === taskToDelete._id) {
+          setActiveTask(null);
+        }
+        setDeleteTaskConfirmOpen(false);
+        setTaskToDelete(null);
+        const pRes = await api.get(`/projects/${id}`);
+        if (pRes.data.success) setProject(pRes.data.project);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete task');
     } finally {
       setSubmitting(false);
     }
@@ -347,6 +491,70 @@ const ProjectDetail = () => {
     }
   };
 
+  // Quick Download PDF Report
+  const handleQuickDownloadPDF = async () => {
+    try {
+      setDownloadingFormat('pdf');
+      const res = await api.get(`/projects/${id}/report`);
+      if (res.data.success) {
+        downloadProjectReportPDF(res.data.report);
+      }
+    } catch (err) {
+      console.warn('Fallback to local state for PDF export:', err);
+      downloadProjectReportPDF({
+        project,
+        tasks,
+        milestones,
+        issues,
+        workspace: currentWorkspace,
+        generatedBy: { name: user?.name, role: user?.role },
+        healthData,
+        stats: {
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter((t) => t.status === 'completed').length,
+          inProgressTasks: tasks.filter((t) => t.status === 'in_progress').length,
+          inReviewTasks: tasks.filter((t) => t.status === 'in_review').length,
+          todoTasks: tasks.filter((t) => t.status === 'todo').length,
+          completionRate: project?.progress || 0
+        }
+      });
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
+  // Quick Download Word (DOC) Report
+  const handleQuickDownloadDOC = async () => {
+    try {
+      setDownloadingFormat('doc');
+      const res = await api.get(`/projects/${id}/report`);
+      if (res.data.success) {
+        downloadProjectReportDOC(res.data.report);
+      }
+    } catch (err) {
+      console.warn('Fallback to local state for DOC export:', err);
+      downloadProjectReportDOC({
+        project,
+        tasks,
+        milestones,
+        issues,
+        workspace: currentWorkspace,
+        generatedBy: { name: user?.name, role: user?.role },
+        healthData,
+        stats: {
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter((t) => t.status === 'completed').length,
+          inProgressTasks: tasks.filter((t) => t.status === 'in_progress').length,
+          inReviewTasks: tasks.filter((t) => t.status === 'in_review').length,
+          todoTasks: tasks.filter((t) => t.status === 'todo').length,
+          completionRate: project?.progress || 0
+        }
+      });
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
   if (loading && !project) {
     return (
       <div className="space-y-6">
@@ -424,6 +632,46 @@ const ProjectDetail = () => {
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
               ✓ ₹{project.paymentAmount || 499} Paid
             </span>
+
+            {/* Project Report Export for Managers, Owners & Workspace Admins */}
+            {canDownloadReport && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Download}
+                  onClick={handleQuickDownloadPDF}
+                  disabled={downloadingFormat === 'pdf'}
+                  className="bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 text-xs font-semibold"
+                  title="Download Project Status & Progress Intelligence Report (PDF)"
+                >
+                  {downloadingFormat === 'pdf' ? 'Generating PDF...' : 'Download PDF'}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={FileDown}
+                  onClick={handleQuickDownloadDOC}
+                  disabled={downloadingFormat === 'doc'}
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 text-xs font-semibold"
+                  title="Download Project Status & Progress Report (Word .doc)"
+                >
+                  {downloadingFormat === 'doc' ? 'Generating DOC...' : 'Download DOC'}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Printer}
+                  onClick={() => setReportModalOpen(true)}
+                  className="text-xs text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  title="Preview & Print Executive Report"
+                >
+                  Preview
+                </Button>
+              </div>
+            )}
 
             {isManagerOrAdmin && (
               <Button
@@ -678,14 +926,36 @@ const ProjectDetail = () => {
                           {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setActiveTask(task)}
-                            className="p-1 text-gray-400 hover:text-indigo-600 rounded"
-                            title="Task details & comments"
-                          >
-                            <MessageSquare className="w-4 h-4 inline" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTask(task)}
+                              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded transition-colors"
+                              title="Task details & comments"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </button>
+                            {!isViewer && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditTask(task)}
+                                  className="p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded transition-colors"
+                                  title="Edit task"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDeleteTask(task)}
+                                  className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
+                                  title="Delete task"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -731,7 +1001,35 @@ const ProjectDetail = () => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-gray-400">#{task.taskNumber}</span>
-                          <Badge variant={task.priority}>{task.priority}</Badge>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={task.priority}>{task.priority}</Badge>
+                            {!isViewer && (
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditTask(task);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                  title="Edit task"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDeleteTask(task);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                  title="Delete task"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <h4 className="font-semibold text-[#172033] dark:text-[#F3F4F6] line-clamp-2">
@@ -1214,12 +1512,20 @@ const ProjectDetail = () => {
             />
           </div>
 
-          <Input
-            label="Due Date"
-            type="date"
-            value={taskForm.dueDate}
-            onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Assignee"
+              value={taskForm.assigneeId}
+              options={assigneeOptions}
+              onChange={(e) => setTaskForm({ ...taskForm, assigneeId: e.target.value })}
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={taskForm.dueDate}
+              onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+            />
+          </div>
 
           <div className="pt-4 flex justify-end gap-3 border-t border-[#E4E7EC] dark:border-[#374151]">
             <Button variant="outline" onClick={() => setTaskModalOpen(false)}>
@@ -1230,6 +1536,143 @@ const ProjectDetail = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* EDIT TASK MODAL */}
+      <Modal
+        isOpen={editTaskModalOpen}
+        onClose={() => setEditTaskModalOpen(false)}
+        title="Edit Task"
+        subtitle="Modify title, description, priority, assignee, and schedule."
+      >
+        <form onSubmit={handleUpdateTask} className="space-y-4">
+          <Input
+            label="Task Title"
+            value={taskEditForm.title}
+            onChange={(e) => setTaskEditForm({ ...taskEditForm, title: e.target.value })}
+            required
+          />
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#9CA3AF] mb-1.5">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              value={taskEditForm.description}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, description: e.target.value })}
+              className="block w-full rounded-lg border border-[#E4E7EC] dark:border-[#374151] bg-white dark:bg-[#111827] text-sm text-[#172033] dark:text-[#F3F4F6] p-3 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Priority"
+              value={taskEditForm.priority}
+              options={[
+                { value: 'urgent', label: 'Urgent' },
+                { value: 'high', label: 'High' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'low', label: 'Low' }
+              ]}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, priority: e.target.value })}
+            />
+            <Select
+              label="Assignee"
+              value={taskEditForm.assigneeId}
+              options={assigneeOptions}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, assigneeId: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Status"
+              value={taskEditForm.status}
+              options={[
+                { value: 'todo', label: 'To Do' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'in_review', label: 'In Review' },
+                { value: 'completed', label: 'Completed' }
+              ]}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, status: e.target.value })}
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={taskEditForm.dueDate}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, dueDate: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#9CA3AF]">
+                Progress Percentage
+              </label>
+              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                {taskEditForm.progress}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={taskEditForm.progress}
+              onChange={(e) => setTaskEditForm({ ...taskEditForm, progress: Number(e.target.value) })}
+              className="w-full accent-indigo-600 cursor-pointer"
+            />
+          </div>
+
+          <Input
+            label="Tags / Labels (comma-separated)"
+            placeholder="Frontend, Bug, High-Priority"
+            value={taskEditForm.labels}
+            onChange={(e) => setTaskEditForm({ ...taskEditForm, labels: e.target.value })}
+          />
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-[#E4E7EC] dark:border-[#374151]">
+            <Button variant="outline" type="button" onClick={() => setEditTaskModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={submitting}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* DELETE TASK CONFIRMATION MODAL */}
+      <Modal
+        isOpen={deleteTaskConfirmOpen}
+        onClose={() => setDeleteTaskConfirmOpen(false)}
+        title="Delete Task"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-[#667085] dark:text-[#9CA3AF]">
+            Are you sure you want to delete task{' '}
+            <strong className="text-gray-900 dark:text-white">
+              #{taskToDelete?.taskNumber}: {taskToDelete?.title}
+            </strong>
+            ? This action cannot be undone and will delete all task history and comments.
+          </p>
+
+          <div className="pt-3 flex justify-end gap-3 border-t border-[#E4E7EC] dark:border-[#374151]">
+            <Button variant="outline" type="button" onClick={() => setDeleteTaskConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              loading={submitting}
+              onClick={handleConfirmDeleteTask}
+            >
+              Delete Task
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* CREATE MILESTONE MODAL */}
@@ -1391,13 +1834,37 @@ const ProjectDetail = () => {
           maxWidth="max-w-2xl"
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Badge variant={activeTask.status}>{activeTask.status}</Badge>
-              <Badge variant={activeTask.priority}>{activeTask.priority}</Badge>
-              {activeTask.dueDate && (
-                <span className="text-xs text-gray-400">
-                  Due {new Date(activeTask.dueDate).toLocaleDateString()}
-                </span>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant={activeTask.status}>{activeTask.status}</Badge>
+                <Badge variant={activeTask.priority}>{activeTask.priority}</Badge>
+                {activeTask.dueDate && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Due {new Date(activeTask.dueDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              {!isViewer && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    icon={Edit2}
+                    onClick={() => handleOpenEditTask(activeTask)}
+                  >
+                    Edit Task
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => handleOpenDeleteTask(activeTask)}
+                  >
+                    Delete
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -1442,6 +1909,30 @@ const ProjectDetail = () => {
           </div>
         </Modal>
       )}
+
+      {/* Executive Project Report Modal */}
+      <ProjectReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        projectId={id}
+        initialProjectData={{
+          project,
+          tasks,
+          milestones,
+          issues,
+          workspace: currentWorkspace,
+          generatedBy: { name: user?.name, role: currentWorkspace?.role || user?.role },
+          healthData,
+          stats: {
+            totalTasks: tasks.length,
+            completedTasks: tasks.filter((t) => t.status === 'completed').length,
+            inProgressTasks: tasks.filter((t) => t.status === 'in_progress').length,
+            inReviewTasks: tasks.filter((t) => t.status === 'in_review').length,
+            todoTasks: tasks.filter((t) => t.status === 'todo').length,
+            completionRate: project?.progress || 0
+          }
+        }}
+      />
     </div>
   );
 };

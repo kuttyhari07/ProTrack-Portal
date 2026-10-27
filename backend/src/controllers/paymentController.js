@@ -51,27 +51,30 @@ const createProjectOrder = async (req, res, next) => {
     const currency = 'INR';
     const receipt = `rcpt_prj_${Date.now().toString().slice(-8)}`;
 
-    let orderId = `order_${Date.now()}`;
     const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_protrack2026';
     const key_secret = process.env.RAZORPAY_KEY_SECRET || 'protrack_razorpay_secret_key_2026';
+    const isMock = !key_id || key_id.includes('test_protrack2026') || key_id === 'rzp_test_protrack2026';
 
-    try {
-      // Attempt live/test call via Razorpay SDK
-      const razorpay = getRazorpayInstance();
-      const order = await razorpay.orders.create({
-        amount: amountInPaise,
-        currency,
-        receipt,
-        notes: {
-          workspaceId: req.workspaceId.toString(),
-          userId: req.user._id.toString(),
-          projectName: projectData.name
-        }
-      });
-      orderId = order.id;
-    } catch (rzpErr) {
-      console.warn('[Razorpay API Warning] Real API call failed or in mock test mode:', rzpErr.message);
-      // Fallback mock order ID for testing when API keys are placeholder
+    let orderId;
+    if (!isMock) {
+      try {
+        const razorpay = getRazorpayInstance();
+        const order = await razorpay.orders.create({
+          amount: amountInPaise,
+          currency,
+          receipt,
+          notes: {
+            workspaceId: req.workspaceId.toString(),
+            userId: req.user._id.toString(),
+            projectName: projectData.name
+          }
+        });
+        orderId = order.id;
+      } catch (rzpErr) {
+        console.warn('[Razorpay API Warning] Real API call failed, falling back to mock mode:', rzpErr.error?.description || rzpErr.message || rzpErr);
+        orderId = `order_sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      }
+    } else {
       orderId = `order_sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     }
 
@@ -172,13 +175,15 @@ const verifyAndCreateProject = async (req, res, next) => {
       });
     }
 
-    // Generate or format projectCode
-    let code = projectPayload.projectCode;
-    if (!code || !code.trim()) {
-      const count = await Project.countDocuments({ workspace: req.workspaceId });
-      code = `PRJ-${String(count + 1).padStart(3, '0')}`;
+    // Generate or format unique projectCode
+    let code = projectPayload.projectCode ? projectPayload.projectCode.trim().toUpperCase() : '';
+    if (!code) {
+      let count = await Project.countDocuments({ workspace: req.workspaceId });
+      do {
+        count++;
+        code = `PRJ-${String(count).padStart(3, '0')}`;
+      } while (await Project.findOne({ workspace: req.workspaceId, projectCode: code }));
     } else {
-      code = code.trim().toUpperCase();
       const existing = await Project.findOne({ workspace: req.workspaceId, projectCode: code });
       if (existing) {
         code = `${code}-${Math.floor(100 + Math.random() * 900)}`;

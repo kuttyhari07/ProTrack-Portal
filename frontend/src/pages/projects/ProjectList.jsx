@@ -29,8 +29,11 @@ import {
   Receipt,
   CheckCircle2,
   ShieldCheck,
-  ExternalLink
+  ExternalLink,
+  FileText,
+  Download
 } from 'lucide-react';
+import ProjectReportModal from '../../components/projects/ProjectReportModal';
 
 const ProjectList = () => {
   const { currentWorkspace, isViewer, isOwnerOrAdmin, isManagerOrAdmin } = useWorkspace();
@@ -60,6 +63,15 @@ const ProjectList = () => {
   const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
   const [billingHistory, setBillingHistory] = useState([]);
   const [loadingBilling, setLoadingBilling] = useState(false);
+
+  // Report Export Modal State
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [selectedReportProjectId, setSelectedReportProjectId] = useState(null);
+
+  const handleOpenReport = (projectId) => {
+    setSelectedReportProjectId(projectId);
+    setReportModalOpen(true);
+  };
 
   // Form State
   const [newProject, setNewProject] = useState({
@@ -489,28 +501,43 @@ const ProjectList = () => {
                   </div>
                 </div>
 
-                {/* Actions row for Admins */}
-                {isOwnerOrAdmin && (
-                  <div className="mt-3 pt-2 flex items-center justify-end gap-1 border-t border-gray-100 dark:border-gray-800">
+                {/* Actions row for Managers, Admins, Owners */}
+                {(isOwnerOrAdmin || isManagerOrAdmin) && (
+                  <div className="mt-3 pt-2 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
                     <button
                       type="button"
-                      onClick={() => handleToggleArchive(project._id)}
-                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
-                      title={project.isArchived ? 'Restore' : 'Archive'}
+                      onClick={() => handleOpenReport(project._id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 py-1 px-2 rounded bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50"
+                      title="Export Project Intelligence Report (PDF/DOC)"
                     >
-                      <Archive className="w-3.5 h-3.5" />
+                      <FileText className="w-3 h-3" />
+                      <span>Export Report</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProjectToDelete(project);
-                        setDeleteConfirmOpen(true);
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-500 rounded"
-                      title="Delete Project"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {isOwnerOrAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleArchive(project._id)}
+                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                            title={project.isArchived ? 'Restore' : 'Archive'}
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProjectToDelete(project);
+                              setDeleteConfirmOpen(true);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-500 rounded"
+                            title="Delete Project"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -531,7 +558,7 @@ const ProjectList = () => {
                   <th className="py-3 px-4">Progress</th>
                   <th className="py-3 px-4">Due Date</th>
                   <th className="py-3 px-4">Owner</th>
-                  {isOwnerOrAdmin && <th className="py-3 px-4 text-right">Actions</th>}
+                  {(isOwnerOrAdmin || isManagerOrAdmin) && <th className="py-3 px-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E4E7EC] dark:divide-[#374151]">
@@ -576,19 +603,30 @@ const ProjectList = () => {
                     <td className="py-3 px-4 text-[#172033] dark:text-[#F3F4F6]">
                       {project.owner?.name || 'Lead'}
                     </td>
-                    {isOwnerOrAdmin && (
-                      <td className="py-3 px-4 text-right">
+                    {(isOwnerOrAdmin || isManagerOrAdmin) && (
+                      <td className="py-3 px-4 text-right space-x-1.5">
                         <button
                           type="button"
-                          onClick={() => {
-                            setProjectToDelete(project);
-                            setDeleteConfirmOpen(true);
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-500 rounded"
-                          title="Delete Project"
+                          onClick={() => handleOpenReport(project._id)}
+                          className="px-2 py-0.5 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 rounded inline-flex items-center gap-1 font-semibold text-[11px] border border-indigo-100 dark:border-indigo-900/50"
+                          title="Export Project Report (PDF/DOC)"
                         >
-                          <Trash2 className="w-4 h-4 inline" />
+                          <FileText className="w-3 h-3 inline" />
+                          <span>Report</span>
                         </button>
+                        {isOwnerOrAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProjectToDelete(project);
+                              setDeleteConfirmOpen(true);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-500 rounded inline-block"
+                            title="Delete Project"
+                          >
+                            <Trash2 className="w-4 h-4 inline" />
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -909,6 +947,16 @@ const ProjectList = () => {
         message="This will permanently delete this project and all its associated tasks, milestones, issues, and files. This action cannot be reversed."
         confirmLabel="Permanently Delete"
         loading={submitting}
+      />
+
+      {/* Executive Project Report Modal */}
+      <ProjectReportModal
+        isOpen={reportModalOpen}
+        onClose={() => {
+          setReportModalOpen(false);
+          setSelectedReportProjectId(null);
+        }}
+        projectId={selectedReportProjectId}
       />
     </div>
   );

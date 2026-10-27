@@ -22,11 +22,11 @@ router.get('/', getTasks);
 router.post('/reminders/trigger', requireRoles(['Owner', 'Admin', 'Project Manager']), triggerReminders);
 router.post('/my-reminders/trigger', restrictViewerMutations, triggerMyReminders);
 router.get('/:id', getTaskById);
-router.post('/', requireRoles(['Owner', 'Admin', 'Project Manager']), createTask);
-router.put('/:id', requireRoles(['Owner', 'Admin', 'Project Manager']), updateTask);
+router.post('/', restrictViewerMutations, createTask);
+router.put('/:id', restrictViewerMutations, updateTask);
 router.patch('/:id/status', restrictViewerMutations, updateTaskStatus);
 router.post('/:id/comments', addComment);
 router.delete('/:id/comments/:commentId', deleteComment);
-router.delete('/:id', requireRoles(['Owner', 'Admin', 'Project Manager']), deleteTask);
+router.delete('/:id', restrictViewerMutations, deleteTask);
 
 module.exports = router;

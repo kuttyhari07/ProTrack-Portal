@@ -594,6 +594,15 @@ const deleteTask = async (req, res, next) => {
       });
     }
 
+    const isLeadOrManager = ['Owner', 'Admin', 'Project Manager'].includes(req.userRole);
+    const isCreator = task.creator && task.creator.toString() === req.user._id.toString();
+    if (!isLeadOrManager && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied. Only project managers or the task creator can delete this task.'
+      });
+    }
+
     await Task.findByIdAndDelete(task._id);
 
     await logActivity({
