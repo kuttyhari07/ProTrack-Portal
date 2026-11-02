@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const connectDB = require('./src/config/db');
@@ -70,9 +71,30 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 // Health check endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'running',
+    product: 'ProTrack SaaS API',
+    health: '/api/health'
+  });
+});
+
 app.get('/api/health', (req, res) => {
+  const databaseConnected = mongoose.connection.readyState === 1;
+
+  if (!databaseConnected) {
+    return res.status(503).json({
+      status: 'unavailable',
+      database: 'disconnected',
+      product: 'ProTrack SaaS API',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  }
+
   res.json({
     status: 'healthy',
+    database: 'connected',
     product: 'ProTrack SaaS API',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
