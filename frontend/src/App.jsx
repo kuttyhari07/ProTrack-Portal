@@ -1,41 +1,37 @@
-import React from 'react';
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 
-// Home / Landing Page
-import LandingPage from './pages/home/LandingPage';
-
-// Auth Pages
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import ForgotPassword from './pages/auth/ForgotPassword';
-
-// Onboarding
-import OnboardingWizard from './pages/onboarding/OnboardingWizard';
-
-// App Pages
-import DashboardOverview from './pages/dashboard/DashboardOverview';
-import ProjectList from './pages/projects/ProjectList';
-import ProjectDetail from './pages/projects/ProjectDetail';
-import GlobalTaskList from './pages/tasks/GlobalTaskList';
-import MilestonesTimeline from './pages/milestones/MilestonesTimeline';
-import IssueList from './pages/issues/IssueList';
-import DocumentsPage from './pages/documents/DocumentsPage';
-import ReportsAnalytics from './pages/reports/ReportsAnalytics';
-import AutomationPage from './pages/automation/AutomationPage';
-import WorkspaceSettings from './pages/workspace/WorkspaceSettings';
-import UserProfile from './pages/profile/UserProfile';
-
-// Master System Admin Pages
+const LandingPage = lazy(() => import('./pages/home/LandingPage'));
+const Login = lazy(() => import('./pages/auth/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const OnboardingWizard = lazy(() => import('./pages/onboarding/OnboardingWizard'));
+const DashboardOverview = lazy(() => import('./pages/dashboard/DashboardOverview'));
+const ProjectList = lazy(() => import('./pages/projects/ProjectList'));
+const ProjectDetail = lazy(() => import('./pages/projects/ProjectDetail'));
+const GlobalTaskList = lazy(() => import('./pages/tasks/GlobalTaskList'));
+const MilestonesTimeline = lazy(() => import('./pages/milestones/MilestonesTimeline'));
+const IssueList = lazy(() => import('./pages/issues/IssueList'));
+const DocumentsPage = lazy(() => import('./pages/documents/DocumentsPage'));
+const ReportsAnalytics = lazy(() => import('./pages/reports/ReportsAnalytics'));
+const AutomationPage = lazy(() => import('./pages/automation/AutomationPage'));
+const WorkspaceSettings = lazy(() => import('./pages/workspace/WorkspaceSettings'));
+const UserProfile = lazy(() => import('./pages/profile/UserProfile'));
 import AdminRoute from './components/auth/AdminRoute';
-import AdminDashboard from './pages/admin/AdminDashboard';
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   return (
     <>
       <ScrollToTop />
-      <Routes>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center text-sm text-gray-500" role="status">
+          Loading page...
+        </div>
+      }>
+        <Routes>
         {/* Public Landing & Home Page */}
         <Route path="/" element={<LandingPage />} />
 
@@ -83,7 +79,8 @@ function App() {
 
       {/* Fallback to Home */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        </Routes>
+      </Suspense>
   </>
 );
 }
