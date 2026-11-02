@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import ThemeToggle from '../../components/layout/ThemeToggle';
-import { Layers, Mail, Lock, AlertCircle, Shield } from 'lucide-react';
+import { Layers, Mail, Lock, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -114,21 +114,6 @@ const Login = () => {
               Sign In to ProTrack
             </Button>
           </form>
-
-          {/* Quick-Fill Admin Credentials */}
-          <div className="mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('protrack24@gmail.com');
-                setPassword('Admin@ProTrack24');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
-            >
-              <Shield className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Fill Master Admin: protrack24@gmail.com</span>
-            </button>
-          </div>
 
           <div className="mt-4 text-center text-xs text-[#667085] dark:text-[#9CA3AF]">
             Don't have an account?{' '}
