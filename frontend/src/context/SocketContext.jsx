@@ -17,7 +17,8 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const socketInstance = io('/', {
+    const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') || '/';
+    const socketInstance = io(backendUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnectionAttempts: 5

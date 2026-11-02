@@ -236,3 +236,5 @@ ProTrack/
 - **Backend API**: Render, Railway, or AWS Elastic Beanstalk (Node.js runtime).
 - **Frontend SPA**: Vercel, Netlify, or AWS CloudFront (Vite build output in `frontend/dist`).
 - **Database**: MongoDB Atlas Cluster.
+
+For a separately hosted frontend, set the frontend build variable `VITE_API_URL` to the backend origin (for example, `https://protrack-portal.onrender.com`, without `/api`). Set the backend `CLIENT_URL` to the deployed frontend origin. Vite embeds `VITE_API_URL` at build time, so rebuild and redeploy the frontend after changing it. Local development continues to use the Vite `/api` proxy when `VITE_API_URL` is unset.
