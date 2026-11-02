@@ -39,11 +39,11 @@ Active Issues: ${openIssues.length} (${criticalIssues.length} critical)
 Rules: Do NOT invent fake numbers. Ground strictly in the above data. Separate verified facts from recommendations.`;
 
       const modelsToTry = [
-        'gemini-3.5-flash-lite',
-        'gemini-flash-lite-latest',
-        'gemma-4-26b-a4b-it',
-        'gemini-3.8-flash',
-        'gemini-3.5-flash'
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-2.0-flash',
+        'gemini-2.5-flash',
+        'gemini-1.5-pro'
       ];
       let generatedText = null;
 

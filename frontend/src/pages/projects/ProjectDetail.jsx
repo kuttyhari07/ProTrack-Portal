@@ -34,9 +34,17 @@ import {
   ChevronRight,
   Edit2,
   FileDown,
-  Printer
+  Printer,
+  Webhook,
+  Eye
 } from 'lucide-react';
 import ProjectReportModal from '../../components/projects/ProjectReportModal';
+import GanttTimeline from '../../components/projects/GanttTimeline';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
+import IntegrationsModal from '../../components/projects/IntegrationsModal';
+import VoiceTaskInput from '../../components/common/VoiceTaskInput';
+import AIDiagnosticModal from '../../components/common/AIDiagnosticModal';
+import { useSocket } from '../../context/SocketContext';
 import {
   downloadProjectReportPDF,
   downloadProjectReportDOC
@@ -130,6 +138,43 @@ const ProjectDetail = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [downloadingFormat, setDownloadingFormat] = useState(null);
 
+  // Advanced Features & Real-Time Presence State
+  const { socket } = useSocket();
+  const [activeViewers, setActiveViewers] = useState([]);
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [integrationsModalOpen, setIntegrationsModalOpen] = useState(false);
+  const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
+  const [diagnosticData, setDiagnosticData] = useState(null);
+  const [diagnosticType, setDiagnosticType] = useState('task_breakdown');
+
+  const handleBreakdownTask = async (task) => {
+    try {
+      const res = await api.post('/ai/breakdown-task', { taskId: task._id });
+      if (res.data.success) {
+        setDiagnosticData(res.data);
+        setDiagnosticType('task_breakdown');
+        setDiagnosticModalOpen(true);
+        fetchProjectData();
+      }
+    } catch (err) {
+      alert('Failed to generate task breakdown');
+    }
+  };
+
+  const handleDiagnoseIssue = async (issue) => {
+    try {
+      const res = await api.post('/ai/diagnose-issue', { issueId: issue._id });
+      if (res.data.success) {
+        setDiagnosticData(res.data);
+        setDiagnosticType('issue_diagnostic');
+        setDiagnosticModalOpen(true);
+      }
+    } catch (err) {
+      alert('Failed to diagnose issue');
+    }
+  };
+
   // Permission: Project Manager, Workspace Admin, Owner or Project Creator
   const canDownloadReport =
     isManagerOrAdmin ||
@@ -189,6 +234,54 @@ const ProjectDetail = () => {
     fetchProjectData();
   }, [id]);
 
+  // Real-Time Socket.io Presence & Kanban Sync
+  useEffect(() => {
+    if (socket && id && user) {
+      socket.emit('join_project', {
+        projectId: id,
+        user: {
+          _id: user._id || user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role || 'Member'
+        }
+      });
+
+      const handlePresence = (data) => {
+        if (data.projectId === id) {
+          setActiveViewers(data.activeViewers || []);
+        }
+      };
+
+      const handleTaskUpdated = (updatedTask) => {
+        if (updatedTask && updatedTask.project && (updatedTask.project._id === id || updatedTask.project === id)) {
+          setTasks((prev) => prev.map((t) => (t._id === updatedTask._id ? updatedTask : t)));
+        }
+      };
+
+      const handleKanbanSync = (dragData) => {
+        if (dragData && dragData.projectId === id && dragData.taskId) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t._id === dragData.taskId ? { ...t, status: dragData.destinationStatus } : t
+            )
+          );
+        }
+      };
+
+      socket.on('project_presence_update', handlePresence);
+      socket.on('task_updated', handleTaskUpdated);
+      socket.on('kanban_card_moved_sync', handleKanbanSync);
+
+      return () => {
+        socket.emit('leave_project', { projectId: id });
+        socket.off('project_presence_update', handlePresence);
+        socket.off('task_updated', handleTaskUpdated);
+        socket.off('kanban_card_moved_sync', handleKanbanSync);
+      };
+    }
+  }, [socket, id, user]);
+
   const fetchWorkspaceMembers = async () => {
     if (!currentWorkspace?._id) return;
     try {
@@ -221,9 +314,16 @@ const ProjectDetail = () => {
         ])
   ];
 
-  // Quick update task status
+  // Quick update task status with live socket sync
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
     try {
+      if (socket) {
+        socket.emit('kanban_drag_sync', {
+          projectId: id,
+          taskId,
+          destinationStatus: newStatus
+        });
+      }
       const res = await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
       if (res.data.success) {
         setTasks((prev) =>
@@ -580,6 +680,7 @@ const ProjectDetail = () => {
     { id: 'overview', name: 'Overview', icon: FolderKanban },
     { id: 'tasks', name: `Tasks (${tasks.length})`, icon: CheckSquare },
     { id: 'board', name: 'Board', icon: Kanban },
+    { id: 'gantt', name: 'Gantt Timeline', icon: Calendar },
     { id: 'milestones', name: `Milestones (${milestones.length})`, icon: Flag },
     { id: 'issues', name: `Issues (${issues.length})`, icon: AlertCircle },
     { id: 'files', name: `Files (${documents.length})`, icon: FileText },
@@ -621,6 +722,28 @@ const ProjectDetail = () => {
             <p className="mt-1 text-xs sm:text-sm text-[#667085] dark:text-[#9CA3AF] max-w-2xl">
               {project.description || 'No description provided.'}
             </p>
+
+            {/* Real-time Socket Presence Bar */}
+            {activeViewers.length > 0 && (
+              <div className="mt-2.5 flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 w-fit">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                <span className="font-semibold">{activeViewers.length} Live:</span>
+                <div className="flex -space-x-1.5">
+                  {activeViewers.slice(0, 4).map((v, i) => (
+                    <span
+                      key={i}
+                      className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center ring-1.5 ring-white dark:ring-gray-900"
+                      title={`${v.name} (${v.role})`}
+                    >
+                      {v.name.charAt(0)}
+                    </span>
+                  ))}
+                </div>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                  {activeViewers.map((v) => v.name.split(' ')[0]).join(', ')}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -672,6 +795,17 @@ const ProjectDetail = () => {
                 </Button>
               </div>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Webhook}
+              onClick={() => setIntegrationsModalOpen(true)}
+              className="bg-purple-50/70 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 text-xs font-semibold"
+              title="Connect GitHub, Slack & Discord Webhooks"
+            >
+              DevOps & Webhooks
+            </Button>
 
             {isManagerOrAdmin && (
               <Button
@@ -1086,6 +1220,15 @@ const ProjectDetail = () => {
         </div>
       )}
 
+      {/* TAB: GANTT TIMELINE */}
+      {activeTab === 'gantt' && (
+        <GanttTimeline
+          project={project}
+          tasks={tasks}
+          milestones={milestones}
+        />
+      )}
+
       {/* TAB 4: MILESTONES */}
       {activeTab === 'milestones' && (
         <div className="space-y-4">
@@ -1224,15 +1367,27 @@ const ProjectDetail = () => {
                       </div>
                     </div>
 
-                    {!isViewer && issue.status !== 'resolved' && (
+                    <div className="flex items-center gap-2">
                       <Button
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleResolveIssue(issue._id)}
+                        onClick={() => handleDiagnoseIssue(issue)}
+                        className="bg-amber-50/70 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 text-xs font-semibold flex items-center gap-1"
+                        title="AI Root-Cause Diagnosis and Step-by-Step Fix"
                       >
-                        Resolve
+                        <Sparkles className="w-3.5 h-3.5" />
+                        AI Diagnose & Fix
                       </Button>
-                    )}
+                      {!isViewer && issue.status !== 'resolved' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleResolveIssue(issue._id)}
+                        >
+                          Resolve
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1289,6 +1444,18 @@ const ProjectDetail = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={Eye}
+                        onClick={() => {
+                          setPreviewDoc(doc);
+                          setPreviewModalOpen(true);
+                        }}
+                        className="text-xs"
+                      >
+                        Preview
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -1466,6 +1633,25 @@ const ProjectDetail = () => {
         subtitle={`Adding deliverable to ${project.name}`}
       >
         <form onSubmit={handleCreateTask} className="space-y-4">
+          {/* AI Voice-to-Task Input */}
+          <div className="flex items-center justify-between p-2.5 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+            <div>
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">Fast AI Voice Fill</span>
+              <p className="text-[10px] text-indigo-600 dark:text-indigo-400">Speak to auto-fill title, priority, due date & description</p>
+            </div>
+            <VoiceTaskInput
+              onTaskParsed={(parsed) => {
+                setTaskForm((prev) => ({
+                  ...prev,
+                  title: parsed.title || prev.title,
+                  description: parsed.description || prev.description,
+                  priority: parsed.priority || prev.priority,
+                  dueDate: parsed.dueDate ? new Date(parsed.dueDate).toISOString().split('T')[0] : prev.dueDate
+                }));
+              }}
+            />
+          </div>
+
           <Input
             label="Task Title"
             placeholder="e.g. Implement OIDC token exchange"
@@ -1850,6 +2036,17 @@ const ProjectDetail = () => {
                     type="button"
                     variant="outline"
                     size="sm"
+                    onClick={() => handleBreakdownTask(activeTask)}
+                    className="bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 text-xs font-semibold flex items-center gap-1"
+                    title="Breakdown this deliverable into subtasks and acceptance criteria"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    AI Breakdown
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     icon={Edit2}
                     onClick={() => handleOpenEditTask(activeTask)}
                   >
@@ -1932,6 +2129,32 @@ const ProjectDetail = () => {
             completionRate: project?.progress || 0
           }
         }}
+      />
+
+      {/* In-App Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => {
+          setPreviewModalOpen(false);
+          setPreviewDoc(null);
+        }}
+        document={previewDoc}
+        onDownload={handleDownloadFile}
+      />
+
+      {/* DevOps & Webhooks (GitHub, Slack, Discord) Modal */}
+      <IntegrationsModal
+        isOpen={integrationsModalOpen}
+        onClose={() => setIntegrationsModalOpen(false)}
+        project={project}
+      />
+
+      {/* AI Subtask Breakdown & Blocker Diagnostic Modal */}
+      <AIDiagnosticModal
+        isOpen={diagnosticModalOpen}
+        onClose={() => setDiagnosticModalOpen(false)}
+        data={diagnosticData}
+        type={diagnosticType}
       />
     </div>
   );

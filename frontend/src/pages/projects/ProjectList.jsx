@@ -31,9 +31,11 @@ import {
   ShieldCheck,
   ExternalLink,
   FileText,
-  Download
+  Download,
+  Sparkles
 } from 'lucide-react';
 import ProjectReportModal from '../../components/projects/ProjectReportModal';
+import AIProjectGeneratorModal from '../../components/projects/AIProjectGeneratorModal';
 
 const ProjectList = () => {
   const { currentWorkspace, isViewer, isOwnerOrAdmin, isManagerOrAdmin } = useWorkspace();
@@ -54,6 +56,7 @@ const ProjectList = () => {
 
   // Modals & Payment State
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [aiGenModalOpen, setAiGenModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -268,13 +271,24 @@ const ProjectList = () => {
           </Button>
 
           {isManagerOrAdmin && (
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => setCreateModalOpen(true)}
-            >
-              Create Project (₹{projectFee})
-            </Button>
+            <>
+              <Button
+                size="sm"
+                onClick={() => setAiGenModalOpen(true)}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
+                title="Decompose any product idea into a complete project with milestones and tasks"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                ✨ AI Project Generator
+              </Button>
+              <Button
+                variant="primary"
+                icon={Plus}
+                onClick={() => setCreateModalOpen(true)}
+              >
+                Create Project (₹{projectFee})
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -957,6 +971,15 @@ const ProjectList = () => {
           setSelectedReportProjectId(null);
         }}
         projectId={selectedReportProjectId}
+      />
+
+      {/* AI Autonomous Project Generator Modal */}
+      <AIProjectGeneratorModal
+        isOpen={aiGenModalOpen}
+        onClose={() => setAiGenModalOpen(false)}
+        onProjectCreated={() => {
+          fetchProjects();
+        }}
       />
     </div>
   );

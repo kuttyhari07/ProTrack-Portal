@@ -8,8 +8,9 @@ import Select from '../../components/common/Select';
 import Modal from '../../components/common/Modal';
 import EmptyState from '../../components/common/EmptyState';
 import { TableSkeleton } from '../../components/common/Skeleton';
-import { FileText, Upload, Download, Trash2, Search, HardDrive, FileCheck } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, Search, HardDrive, FileCheck, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 
 const DocumentsPage = () => {
   const { isViewer, isOwnerOrAdmin } = useWorkspace();
@@ -27,6 +28,10 @@ const DocumentsPage = () => {
   const [targetProject, setTargetProject] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Document preview state
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const fetchDocuments = async () => {
     try {
@@ -276,6 +281,17 @@ const DocumentsPage = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          icon={Eye}
+                          onClick={() => {
+                            setPreviewDoc(doc);
+                            setPreviewModalOpen(true);
+                          }}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           icon={Download}
                           onClick={() => handleDownload(doc._id, doc.originalName)}
                         >
@@ -360,6 +376,17 @@ const DocumentsPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* In-App Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => {
+          setPreviewModalOpen(false);
+          setPreviewDoc(null);
+        }}
+        document={previewDoc}
+        onDownload={handleDownload}
+      />
     </div>
   );
 };

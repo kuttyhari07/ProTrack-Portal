@@ -49,10 +49,11 @@ const AIChatBot = () => {
   }, [messages, isOpen, isMinimized]);
 
   const quickPrompts = [
+    { label: '⚡ Postpone Overdue Tasks', query: 'Postpone all overdue tasks by 3 days' },
+    { label: '📋 Create Urgent Task', query: 'Create task API security audit and rate limiting high priority' },
+    { label: '⚠️ Report Critical Blocker', query: 'Report issue Database connection latency critical' },
     { label: '📋 My assigned tasks', query: 'What tasks are assigned to me?' },
     { label: '⏰ Tasks due soon', query: 'What are my upcoming due dates and deadlines?' },
-    { label: '🌐 About ProTrack', query: 'Machi ProTrack website pathi sollu enna features irukku' },
-    { label: '⚠️ How to report an issue?', query: 'How do I report a blocker or issue?' },
     { label: '🚀 Project overview', query: 'Summarize the active projects and their progress' }
   ];
 
@@ -85,6 +86,7 @@ const AIChatBot = () => {
           id: Date.now() + 1,
           sender: 'bot',
           text: res.data.reply,
+          actionTaken: res.data.actionTaken,
           timestamp: new Date()
         };
         setMessages((prev) => [...prev, botMsg]);
@@ -295,6 +297,29 @@ const AIChatBot = () => {
                         }`}
                       >
                         {renderFormattedText(m.text)}
+
+                        {m.actionTaken && (
+                          <div className="mt-2.5 p-2 bg-emerald-50 dark:bg-emerald-950/60 rounded-lg border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="font-bold text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                Autonomous Action Executed
+                              </div>
+                              {m.actionTaken.type === 'create_task' && (
+                                <div>Created Task: <strong>"{m.actionTaken.task?.title}"</strong></div>
+                              )}
+                              {m.actionTaken.type === 'update_task_status' && (
+                                <div>Status Updated: <strong>"{m.actionTaken.task?.title}"</strong> ➔ {m.actionTaken.task?.status}</div>
+                              )}
+                              {m.actionTaken.type === 'postpone_tasks' && (
+                                <div>Postponed <strong>{m.actionTaken.count} overdue deliverables</strong> by +{m.actionTaken.shiftDays} days</div>
+                              )}
+                              {m.actionTaken.type === 'create_issue' && (
+                                <div>Reported Blocker: <strong>"{m.actionTaken.issue?.title}"</strong></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <span
                           className={`block text-[9px] mt-1 text-right select-none ${
                             isUser ? 'text-indigo-200' : 'text-gray-400 dark:text-gray-500'

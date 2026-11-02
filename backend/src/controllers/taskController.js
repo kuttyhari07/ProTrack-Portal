@@ -362,6 +362,26 @@ const updateTask = async (req, res, next) => {
     // Re-evaluate project health
     await evaluateProjectHealth(task.project);
 
+    // Dispatch webhook alert if task marked completed
+    if (task.status === 'completed' && previousStatus !== 'completed') {
+      try {
+        const { dispatchWorkspaceAlert } = require('../services/webhookNotificationService');
+        dispatchWorkspaceAlert(req.workspaceId, {
+          type: 'task_completed',
+          title: `Task Completed: ${task.title}`,
+          message: `Deliverable **"${task.title}"** was just completed by **${req.user.name}**! 🎉`,
+          color: 0x10B981,
+          fields: [
+            { name: 'Task', value: task.title },
+            { name: 'Priority', value: task.priority.toUpperCase() },
+            { name: 'Completed By', value: req.user.name }
+          ]
+        });
+      } catch (alertErr) {
+        // Non-blocking
+      }
+    }
+
     const populated = await Task.findById(task._id)
       .populate('project', 'name projectCode')
       .populate('assignee', 'name email avatar title')
@@ -446,6 +466,26 @@ const updateTaskStatus = async (req, res, next) => {
     });
 
     await evaluateProjectHealth(task.project);
+
+    // Dispatch webhook alert if task marked completed
+    if (task.status === 'completed' && previousStatus !== 'completed') {
+      try {
+        const { dispatchWorkspaceAlert } = require('../services/webhookNotificationService');
+        dispatchWorkspaceAlert(req.workspaceId, {
+          type: 'task_completed',
+          title: `Task Completed: ${task.title}`,
+          message: `Deliverable **"${task.title}"** was just completed by **${req.user.name}**! 🎉`,
+          color: 0x10B981,
+          fields: [
+            { name: 'Task', value: task.title },
+            { name: 'Priority', value: task.priority.toUpperCase() },
+            { name: 'Completed By', value: req.user.name }
+          ]
+        });
+      } catch (alertErr) {
+        // Non-blocking
+      }
+    }
 
     const populated = await Task.findById(task._id)
       .populate('project', 'name projectCode')

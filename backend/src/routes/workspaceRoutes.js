@@ -10,7 +10,8 @@ const {
   inviteMember,
   updateMember,
   removeMember,
-  getWorkspaceActivity
+  getWorkspaceActivity,
+  testWebhookIntegration
 } = require('../controllers/workspaceController');
 const { protect } = require('../middleware/auth');
 const { requireWorkspaceMember, requireRoles, restrictViewerMutations } = require('../middleware/workspace');
@@ -24,6 +25,7 @@ router.post('/switch/:workspaceId', switchWorkspace);
 // Workspace scoped subroutes
 router.get('/:workspaceId', requireWorkspaceMember, getWorkspaceDetails);
 router.put('/:workspaceId', requireWorkspaceMember, requireRoles(['Owner', 'Admin']), updateWorkspace);
+router.post('/:workspaceId/integrations/test', requireWorkspaceMember, requireRoles(['Owner', 'Admin']), testWebhookIntegration);
 
 router.get('/:workspaceId/members', requireWorkspaceMember, getWorkspaceMembers);
 router.post('/:workspaceId/invitations', requireWorkspaceMember, requireRoles(['Owner', 'Admin', 'Project Manager']), inviteMember);

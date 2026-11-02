@@ -36,6 +36,7 @@ import {
 } from 'recharts';
 
 import MemberDashboard from './MemberDashboard';
+import AIAutoPilotModal from '../../components/common/AIAutoPilotModal';
 
 const DashboardOverview = () => {
   const { user } = useAuth();
@@ -53,15 +54,22 @@ const DashboardOverview = () => {
   const [myTasks, setMyTasks] = useState([]);
   const [activities, setActivities] = useState([]);
 
+  // AI Automation & Standup State
+  const [dailyBriefing, setDailyBriefing] = useState(null);
+  const [autoPilotModalOpen, setAutoPilotModalOpen] = useState(false);
+  const [autoPilotReport, setAutoPilotReport] = useState(null);
+  const [runningAutoPilot, setRunningAutoPilot] = useState(false);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [reportRes, autoRes, projRes, taskRes, actRes] = await Promise.all([
+      const [reportRes, autoRes, projRes, taskRes, actRes, briefingRes] = await Promise.all([
         api.get('/reports/workspace'),
         api.get('/automation/insights'),
         api.get('/projects?limit=5&sortBy=updatedAt&order=desc'),
         api.get('/tasks?filter=my_tasks&limit=6'),
-        api.get(`/workspaces/${currentWorkspace?._id}/activity?limit=6`)
+        api.get(`/workspaces/${currentWorkspace?._id}/activity?limit=6`),
+        api.get('/ai/daily-briefing').catch(() => ({ data: { success: false } }))
       ]);
 
       if (reportRes.data.success) setReportData(reportRes.data);
@@ -69,10 +77,27 @@ const DashboardOverview = () => {
       if (projRes.data.success) setRecentProjects(projRes.data.projects);
       if (taskRes.data.success) setMyTasks(taskRes.data.tasks);
       if (actRes.data.success) setActivities(actRes.data.activities);
+      if (briefingRes.data?.success) setDailyBriefing(briefingRes.data.briefing);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRunAutoPilot = async () => {
+    try {
+      setRunningAutoPilot(true);
+      const res = await api.post('/ai/auto-pilot');
+      if (res.data.success) {
+        setAutoPilotReport(res.data.report);
+        setAutoPilotModalOpen(true);
+        fetchDashboardData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to run AI Auto-Pilot');
+    } finally {
+      setRunningAutoPilot(false);
     }
   };
 
@@ -127,6 +152,15 @@ const DashboardOverview = () => {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <Button
+            size="sm"
+            onClick={handleRunAutoPilot}
+            disabled={runningAutoPilot}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {runningAutoPilot ? 'Optimizing...' : '⚡ Run AI Auto-Pilot'}
+          </Button>
           <Link to="/projects">
             <Button variant="primary" icon={FolderKanban} size="sm">
               Manage Projects
@@ -139,6 +173,45 @@ const DashboardOverview = () => {
           </Link>
         </div>
       </div>
+
+      {/* AI Daily Standup Briefing Card */}
+      {dailyBriefing && (
+        <Card className="p-4 bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-white dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-gray-900 border-indigo-100 dark:border-indigo-900/60 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> AI Daily Standup
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                  {dailyBriefing.date}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                {dailyBriefing.aiRecommendation}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 shadow-2xs border border-gray-200/60 dark:border-gray-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-bold text-gray-900 dark:text-white">{dailyBriefing.shippedCount}</span>
+                <span className="text-gray-500 dark:text-gray-400 text-[11px]">Shipped</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 shadow-2xs border border-gray-200/60 dark:border-gray-700">
+                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                <span className="font-bold text-gray-900 dark:text-white">{dailyBriefing.inProgressCount}</span>
+                <span className="text-gray-500 dark:text-gray-400 text-[11px]">In Flight</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 shadow-2xs border border-gray-200/60 dark:border-gray-700">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="font-bold text-gray-900 dark:text-white">{dailyBriefing.blockersCount}</span>
+                <span className="text-gray-500 dark:text-gray-400 text-[11px]">Blockers</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 1. Metric Cards (6 core metrics) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
@@ -535,6 +608,14 @@ const DashboardOverview = () => {
           </div>
         </Card>
       </div>
+
+      {/* AI Auto-Pilot Optimization Results Modal */}
+      <AIAutoPilotModal
+        isOpen={autoPilotModalOpen}
+        onClose={() => setAutoPilotModalOpen(false)}
+        report={autoPilotReport}
+        onRefresh={fetchDashboardData}
+      />
     </div>
   );
 };

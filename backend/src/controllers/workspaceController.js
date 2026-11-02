@@ -178,6 +178,9 @@ const updateWorkspace = async (req, res, next) => {
     if (settings) {
       workspace.settings = { ...workspace.settings, ...settings };
     }
+    if (req.body.integrations) {
+      workspace.integrations = { ...workspace.integrations, ...req.body.integrations };
+    }
 
     await workspace.save();
 
@@ -518,6 +521,46 @@ const getWorkspaceActivity = async (req, res, next) => {
   }
 };
 
+// @desc    Test Slack or Discord Webhook
+// @route   POST /api/workspaces/:workspaceId/integrations/test
+// @access  Private (Owner, Admin)
+const testWebhookIntegration = async (req, res, next) => {
+  try {
+    const { platform, webhookUrl } = req.body;
+    const { sendSlackNotification, sendDiscordNotification } = require('../services/webhookNotificationService');
+
+    let success = false;
+    if (platform === 'slack') {
+      success = await sendSlackNotification(webhookUrl, {
+        title: 'Connection Test Successful',
+        message: `Hello! 👋 Your Slack channel has been successfully connected to **${req.workspace?.name || 'ProTrack Workspace'}**.\nYou will now receive live alerts for critical blockers, deliverable updates, and milestone achievements!`,
+        fields: [
+          { name: 'Status', value: 'Active' },
+          { name: 'Connected By', value: req.user.name }
+        ]
+      });
+    } else if (platform === 'discord') {
+      success = await sendDiscordNotification(webhookUrl, {
+        title: 'Connection Test Successful',
+        message: `Hello! 👋 Your Discord channel is now connected to **${req.workspace?.name || 'ProTrack Workspace'}**.\nYou will receive real-time notifications for sprint milestones, blockers, and deliverables!`,
+        color: 0x4F46E5,
+        fields: [
+          { name: 'Status', value: 'Active' },
+          { name: 'Connected By', value: req.user.name }
+        ]
+      });
+    }
+
+    if (success) {
+      return res.json({ success: true, message: `Test ping delivered successfully to ${platform}!` });
+    } else {
+      return res.status(400).json({ success: false, message: `Could not reach ${platform} webhook URL. Please check the URL and permissions.` });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getMyWorkspaces,
   createWorkspace,
@@ -528,5 +571,6 @@ module.exports = {
   inviteMember,
   updateMember,
   removeMember,
-  getWorkspaceActivity
+  getWorkspaceActivity,
+  testWebhookIntegration
 };

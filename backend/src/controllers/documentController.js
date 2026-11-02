@@ -141,6 +141,40 @@ const downloadDocument = async (req, res, next) => {
   }
 };
 
+// @desc    Preview document inline (for image, pdf, text, code)
+// @route   GET /api/documents/:id/preview
+// @access  Private (Workspace Member)
+const previewDocument = async (req, res, next) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      workspace: req.workspaceId
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document record not found'
+      });
+    }
+
+    const filePath = path.resolve(document.filePath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File does not exist on storage disk'
+      });
+    }
+
+    res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Delete document
 // @route   DELETE /api/documents/:id
 // @access  Private (Workspace Member - restrict Viewer)
@@ -200,5 +234,6 @@ module.exports = {
   getDocuments,
   uploadDocument,
   downloadDocument,
+  previewDocument,
   deleteDocument
 };

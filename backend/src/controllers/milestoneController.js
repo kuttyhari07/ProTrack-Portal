@@ -158,6 +158,24 @@ const updateMilestone = async (req, res, next) => {
 
     await evaluateProjectHealth(milestone.project);
 
+    if (milestone.status === 'completed') {
+      try {
+        const { dispatchWorkspaceAlert } = require('../services/webhookNotificationService');
+        dispatchWorkspaceAlert(req.workspaceId, {
+          type: 'milestone_completed',
+          title: `🎯 Milestone Achieved: ${milestone.title}`,
+          message: `Sprint milestone **"${milestone.title}"** was successfully reached! 🚀`,
+          color: 0x6366F1,
+          fields: [
+            { name: 'Milestone', value: milestone.title },
+            { name: 'Completed By', value: req.user.name }
+          ]
+        });
+      } catch (alertErr) {
+        // Non-blocking
+      }
+    }
+
     const populated = await Milestone.findById(milestone._id)
       .populate('project', 'name projectCode')
       .populate('relatedTasks', 'title status priority taskNumber progress');

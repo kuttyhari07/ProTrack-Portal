@@ -126,6 +126,26 @@ const createIssue = async (req, res, next) => {
 
     await evaluateProjectHealth(project._id);
 
+    // Dispatch webhook alert if critical or high issue
+    if (priority === 'critical' || priority === 'high') {
+      try {
+        const { dispatchWorkspaceAlert } = require('../services/webhookNotificationService');
+        dispatchWorkspaceAlert(req.workspaceId, {
+          type: 'critical_issue',
+          title: `⚠️ ${priority.toUpperCase()} Blocker Logged: ${issue.title}`,
+          message: `A new **${priority.toUpperCase()}** ${category} issue was reported by **${req.user.name}** in project **${project.name}**:\n> "${issue.description || issue.title}"`,
+          color: 0xEF4444,
+          fields: [
+            { name: 'Severity', value: priority.toUpperCase() },
+            { name: 'Category', value: category },
+            { name: 'Project', value: project.name }
+          ]
+        });
+      } catch (alertErr) {
+        // Non-blocking
+      }
+    }
+
     const populated = await Issue.findById(issue._id)
       .populate('project', 'name projectCode')
       .populate('assignee', 'name email avatar title')

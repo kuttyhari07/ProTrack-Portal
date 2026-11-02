@@ -4,6 +4,7 @@ const {
   getDocuments,
   uploadDocument,
   downloadDocument,
+  previewDocument,
   deleteDocument
 } = require('../controllers/documentController');
 const { protect } = require('../middleware/auth');
@@ -16,6 +17,7 @@ router.use(requireWorkspaceMember);
 router.get('/', getDocuments);
 router.post('/upload', restrictViewerMutations, upload.single('file'), uploadDocument);
 router.get('/:id/download', downloadDocument);
+router.get('/:id/preview', previewDocument);
 router.delete('/:id', restrictViewerMutations, deleteDocument);
 
 module.exports = router;

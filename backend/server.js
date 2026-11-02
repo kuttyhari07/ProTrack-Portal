@@ -26,6 +26,7 @@ const aiRoutes = require('./src/routes/aiRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const feedbackRoutes = require('./src/routes/feedbackRoutes');
+const webhookRoutes = require('./src/routes/webhookRoutes');
 const seedAdminUser = require('./src/utils/seedAdmin');
 
 const app = express();
@@ -94,6 +95,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Error Handler Middleware
 app.use(errorHandler);

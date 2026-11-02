@@ -39,6 +39,32 @@ const workspaceSchema = new mongoose.Schema(
         enum: ['Admin', 'Project Manager', 'Member', 'Viewer'],
         default: 'Member'
       }
+    },
+    integrations: {
+      slackWebhookUrl: {
+        type: String,
+        default: ''
+      },
+      discordWebhookUrl: {
+        type: String,
+        default: ''
+      },
+      githubWebhookSecret: {
+        type: String,
+        default: ''
+      },
+      notifyOnTaskCompleted: {
+        type: Boolean,
+        default: true
+      },
+      notifyOnCriticalIssue: {
+        type: Boolean,
+        default: true
+      },
+      notifyOnMilestone: {
+        type: Boolean,
+        default: true
+      }
     }
   },
   {

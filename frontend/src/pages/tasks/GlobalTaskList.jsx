@@ -11,6 +11,7 @@ import Badge from '../../components/common/Badge';
 import Modal from '../../components/common/Modal';
 import EmptyState from '../../components/common/EmptyState';
 import { TableSkeleton } from '../../components/common/Skeleton';
+import VoiceTaskInput from '../../components/common/VoiceTaskInput';
 import {
   CheckSquare,
   Plus,
@@ -722,6 +723,25 @@ const GlobalTaskList = () => {
             onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })}
             required
           />
+
+          {/* AI Voice-to-Task Input */}
+          <div className="flex items-center justify-between p-2.5 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+            <div>
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">Fast AI Voice Fill</span>
+              <p className="text-[10px] text-indigo-600 dark:text-indigo-400">Speak to auto-fill title, priority, due date & description</p>
+            </div>
+            <VoiceTaskInput
+              onTaskParsed={(parsed) => {
+                setTaskForm((prev) => ({
+                  ...prev,
+                  title: parsed.title || prev.title,
+                  description: parsed.description || prev.description,
+                  priority: parsed.priority || prev.priority,
+                  dueDate: parsed.dueDate ? new Date(parsed.dueDate).toISOString().split('T')[0] : prev.dueDate
+                }));
+              }}
+            />
+          </div>
 
           <Input
             label="Task Title"
